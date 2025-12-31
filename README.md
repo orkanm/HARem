@@ -1,44 +1,29 @@
 # HARem - Home Assistant Remote Controller
 
-This project implements a smart home remote controller using **ESPHome** on an **ESP32-C3**. It features an OLED display and a rotary encoder to navigate and control Home Assistant entities.
+This project implements a "Thin Client" smart home remote using **ESPHome** on an **ESP32-C3**. It features a 5-line OLED display with scrolling text and a rotary encoder to navigate Home Assistant Areas dynamically.
 
-## Hardware Requirements
-- **Microcontroller**: ESP32-C3 (e.g., Super Mini)
-- **Display**: SH1106 OLED (128x64) 1.3" I2C
-- **Input**: Rotary Encoder (EC11)
-- **Wiring**:
-  - **SDA**: GPIO5
-  - **SCL**: GPIO6
-  - **Encoder A**: GPIO8
-  - **Encoder B**: GPIO9
-  - **Encoder Button**: GPIO7
+## Quick Start
 
-## Configuration
+1.  **Hardware**: ESP32-C3 + SH1106 OLED + Rotary Encoder.
+2.  **Firmware**: Flash `remote_controller.yaml`.
+3.  **Home Assistant**: Follow the [Setup Guide](docs/generic_menu_setup.md) to create Helpers and Automation.
 
-The main configuration file is `remote_controller.yaml`.
+## Documentation
 
-### Secrets
-You should use a `secrets.yaml` file (referenced in the config) or update the `remote_controller.yaml` directly with your credentials:
-- `wifi_ssid` / `wifi_password`
-- `api_key` (Base64 encryption key for Home Assistant API)
+*   **[Setup Guide](docs/generic_menu_setup.md)**: How to configure Home Assistant.
+*   **[Project Walkthrough](docs/walkthrough.md)**: Architecture, features, and troubleshooting.
 
 ## Features
-- **Cyclic Menu**: Rotate the knob to scroll through devices/scenes.
-- **Feedback**: Display shows connection status (WiFi signal) and current state of devices (icons).
-- **Control**: Click the knob to toggle the selected device.
 
-## Flashing Instructions
+-   **Zero Maintenance**: Automatically syncs rooms and devices from Home Assistant.
+-   **5-Line Display**: Shows previous/next items and detailed selection context.
+-   **Scrolling Text**: Long names automatically scroll (Marquee effect).
+-   **Robust Navigation**: Reliable "Back" (Long Press) and cyclic scrolling.
 
-The firmware uses the **ESP-IDF** framework.
+## Building
 
-### Pre-compiled Firmware
-After a successful build, the firmware binary is located at:
-`.esphome/build/harem/.pioenvs/harem/firmware.factory.bin`
+```bash
+esphome run remote_controller.yaml
+```
 
-You can flash this binary using `esptool` or the [ESPHome Web Flasher](https://web.esphome.io/).
-
-### Compiling Locally
-To compile the firmware yourself:
-1. Install ESPHome (e.g., in a venv).
-2. Run `esphome compile remote_controller.yaml`.
-3. To upload directly: `esphome upload remote_controller.yaml`.
+See [walkthrough.md](docs/walkthrough.md) for detailed architecture diagrams.
