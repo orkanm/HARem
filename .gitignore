@@ -1,0 +1,14 @@
+# Secrets
+secrets.yaml
+
+# ESPHome build artifacts
+.esphome/
+.pioenvs/
+.pio/
+
+# Python Virtual Env
+esphome_venv/
+
+# OS specific
+.DS_Store
+Thumbs.db
