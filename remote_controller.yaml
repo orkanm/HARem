@@ -149,23 +149,18 @@ sensor:
       number: GPIO9
       mode: INPUT_PULLUP
     resolution: 1
-    on_value:
-      then:
-        - component.update: my_display
-        - if:
-            condition:
-              lambda: 'return x > 0;'
-            then:
-              - homeassistant.event:
-                  event: esphome.remote_action
-                  data:
-                    action: next
-            else:
-              - homeassistant.event:
-                  event: esphome.remote_action
-                  data:
-                    action: prev
-        - lambda: 'id(encoder).state = 0;' # Reset encoder to avoid overflow and keep relative logic
+    on_clockwise:
+      - homeassistant.event:
+          event: esphome.remote_action
+          data:
+            action: next
+      - component.update: my_display
+    on_anticlockwise:
+      - homeassistant.event:
+          event: esphome.remote_action
+          data:
+            action: prev
+      - component.update: my_display
 
   - platform: wifi_signal
     name: "WiFi Signal"

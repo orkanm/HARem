@@ -43,7 +43,7 @@ action:
   - variables:
       list_size: >
         {% if path == 'ROOT' or path == '' %} {{ areas() | length }}
-        {% else %} {{ area_entities(path) | length }} {% endif %}
+        {% else %} {{ area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | list | length }} {% endif %}
 
   - choose:
       # ROTATE -> Change Index
@@ -75,10 +75,11 @@ action:
                 data: {value: 0}
             else:
               - variables:
-                  entities: "{{ area_entities(path) | sort }}"
+                  entities: "{{ area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | sort }}"
                   selected_entity: "{{ entities[idx % list_size] }}"
               - service: homeassistant.toggle
                 target: {entity_id: "{{ selected_entity }}"}
+              - delay: "00:00:00.5" # Wait for state change to propagate
 
       # BACK -> Exit Room
       - conditions: "{{ action == 'back' }}"
@@ -125,7 +126,7 @@ action:
     else:
       # DEVICES LIST
       - variables:
-          list: "{{ area_entities(path) | sort }}"
+          list: "{{ area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | sort }}"
       - if: "{{ list | length > 0 }}"
         then:
           - service: input_text.set_value
