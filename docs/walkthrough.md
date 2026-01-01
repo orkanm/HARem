@@ -46,8 +46,19 @@ sequenceDiagram
 
 ### 3. Navigation Controls
 *   **Rotate**: Scroll Up/Down.
-*   **Click**: Enter Room / Toggle Device.
+*   **Click**: Enter Room / Toggle Device. (Short Click detection widened to 10ms-850ms, eliminating dead zones.)
 *   **Long Press (>600ms)**: Back to previous menu.
+
+### 4. Final Verification (v0.1)
+- **Startup**: Verified sequence (Splash -> Waiting -> v0.1).
+- **Navigation**: "Back" button reliably returns to previous room.
+- **Display**: Long status strings are truncated; short lists use smart masking to prevent duplicates.
+- **Versioning**: Centralized version management via `substitutions` block.
+
+## 5. Next Steps
+- [ ] Mount hardware in final enclosure.
+- [ ] 3D Print case (files not included in this repo).
+- [ ] Enjoy!
 
 ## Setup Guide
 
