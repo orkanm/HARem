@@ -114,7 +114,7 @@ binary_sensor:
     id: encoder_button
     on_click:
       - min_length: 10ms
-        max_length: 850ms
+        max_length: 800ms
         then:
           - logger.log:
               format: "Short Click Detected!"
@@ -123,7 +123,7 @@ binary_sensor:
               event: esphome.remote_action
               data:
                 action: click
-      - min_length: 1000ms
+      - min_length: 801ms
         max_length: 10s
         then:
           - logger.log:
