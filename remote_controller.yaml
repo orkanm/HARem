@@ -250,7 +250,7 @@ display:
         } else {
           // Waiting Screen (After 3.0s)
           it.print(64, 20, id(font_header), TextAlign::TOP_CENTER, "Waiting...");
-          it.print(64, 50, id(font_small), TextAlign::TOP_CENTER, "v1.0");
+          it.print(64, 50, id(font_small), TextAlign::TOP_CENTER, "v0.1");
         }
       }
 
