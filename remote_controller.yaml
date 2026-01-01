@@ -97,6 +97,8 @@ font:
     id: font_small
     size: 10
 
+
+
 # Globals to track state
 # Globals removed - Logic moved to Home Assistant
 
@@ -240,7 +242,16 @@ display:
            it.print(128, 29, id(font_small), TextAlign::TOP_RIGHT, status_text.c_str());
         }
       } else {
-        it.print(64, 28, id(font_header), TextAlign::TOP_CENTER, "Waiting...");
+        if (millis() < 3000) {
+          // Splash Screen (First 3.0s)
+          it.print(64, 0, id(font_header), TextAlign::TOP_CENTER, "HARem");
+          it.print(64, 25, id(font_small), TextAlign::TOP_CENTER, "HomeAssistant Remote");
+          it.print(64, 40, id(font_small), TextAlign::TOP_CENTER, "Remote controller");
+        } else {
+          // Waiting Screen (After 3.0s)
+          it.print(64, 20, id(font_header), TextAlign::TOP_CENTER, "Waiting...");
+          it.print(64, 50, id(font_small), TextAlign::TOP_CENTER, "v1.0");
+        }
       }
 
       // Line 4 (Index + 1) - y=41

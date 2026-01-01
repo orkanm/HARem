@@ -19,6 +19,7 @@ In Home Assistant > Settings > Devices & Services > Helpers:
 5.  **Text Helper**: `input_text.harem_line_3` (Name: "Remote Line 3")
 6.  **Text Helper**: `input_text.harem_line_4` (Name: "Remote Line 4")
 7.  **Text Helper**: `input_text.harem_line_5` (Name: "Remote Line 5")
+8.  **Text Helper**: `input_text.harem_line_3_status` (Name: "Remote Line 3 Status")
 
 ## 2. Create Automation
 **Name**: "Remote: Generic Menu Controller"
@@ -82,14 +83,18 @@ action:
               - delay: "00:00:00.5" # Wait for state change to propagate
 
       # BACK -> Exit Room
-      - conditions: "{{ action == 'back' }}"
+      - conditions: "{{ action == 'back' and path != 'ROOT' }}"
         sequence:
+          - variables:
+              sorted_areas: "{{ areas() | sort }}"
+              # Find index of current room to restore position
+              restore_idx: "{{ sorted_areas.index(path) if path in sorted_areas else 0 }}"
+          - service: input_number.set_value
+            target: {entity_id: input_number.harem_menu_index}
+            data: {value: "{{ restore_idx }}"}
           - service: input_text.set_value
             target: {entity_id: input_text.harem_menu_path}
             data: {value: "ROOT"}
-          - service: input_number.set_value
-            target: {entity_id: input_number.harem_menu_index}
-            data: {value: 0}
 
   # 2. UPDATE DISPLAY (5 LINES)
   - variables:
@@ -105,23 +110,33 @@ action:
         then:
           - service: input_text.set_value
             target: {entity_id: input_text.harem_line_1}
-            data: {value: "{{ area_name(list[(idx - 2) % list|length]) }}"}
+            # Hide Line 1 if list size <= 2
+            data: {value: "{{ area_name(list[(idx - 2) % list|length]) if list|length > 2 else '' }}"}
           - service: input_text.set_value
             target: {entity_id: input_text.harem_line_2}
-            data: {value: "{{ area_name(list[(idx - 1) % list|length]) }}"}
+            # Hide Line 2 if list size == 1
+            data: {value: "{{ area_name(list[(idx - 1) % list|length]) if list|length > 1 else '' }}"}
           - service: input_text.set_value
             target: {entity_id: input_text.harem_line_3}
             data: {value: "> {{ area_name(list[idx % list|length]) }}"}
           - service: input_text.set_value
+            target: {entity_id: input_text.harem_line_3_status}
+            data: {value: ""}
+          - service: input_text.set_value
             target: {entity_id: input_text.harem_line_4}
-            data: {value: "{{ area_name(list[(idx + 1) % list|length]) }}"}
+            # Hide Line 4 if list size == 1
+            data: {value: "{{ area_name(list[(idx + 1) % list|length]) if list|length > 1 else '' }}"}
           - service: input_text.set_value
             target: {entity_id: input_text.harem_line_5}
-            data: {value: "{{ area_name(list[(idx + 2) % list|length]) }}"}
+            # Hide Line 5 if list size <= 2
+            data: {value: "{{ area_name(list[(idx + 2) % list|length]) if list|length > 2 else '' }}"}
         else:
            - service: input_text.set_value
              target: {entity_id: input_text.harem_line_3}
              data: {value: "No Areas Found"}
+           - service: input_text.set_value
+             target: {entity_id: input_text.harem_line_3_status}
+             data: {value: ""}
 
     else:
       # DEVICES LIST
@@ -131,23 +146,33 @@ action:
         then:
           - service: input_text.set_value
             target: {entity_id: input_text.harem_line_1}
-            data: {value: "{{ state_attr(list[(idx - 2) % list|length], 'friendly_name') }}"}
+            # Hide Line 1 if list size <= 2
+            data: {value: "{{ state_attr(list[(idx - 2) % list|length], 'friendly_name') if list|length > 2 else '' }}"}
           - service: input_text.set_value
             target: {entity_id: input_text.harem_line_2}
-            data: {value: "{{ state_attr(list[(idx - 1) % list|length], 'friendly_name') }}"}
+            # Hide Line 2 if list size == 1
+            data: {value: "{{ state_attr(list[(idx - 1) % list|length], 'friendly_name') if list|length > 1 else '' }}"}
           - service: input_text.set_value
             target: {entity_id: input_text.harem_line_3}
-            data: {value: "> {{ state_attr(list[idx % list|length], 'friendly_name') }} ({{ states(list[idx % list|length]) }})" }
+            data: {value: "> {{ state_attr(list[idx % list|length], 'friendly_name') }}"}
+          - service: input_text.set_value
+            target: {entity_id: input_text.harem_line_3_status}
+            data: {value: "({{ states(list[idx % list|length]) | truncate(12, True, '..') }})" }
           - service: input_text.set_value
             target: {entity_id: input_text.harem_line_4}
-            data: {value: "{{ state_attr(list[(idx + 1) % list|length], 'friendly_name') }}"}
+            # Hide Line 4 if list size == 1
+            data: {value: "{{ state_attr(list[(idx + 1) % list|length], 'friendly_name') if list|length > 1 else '' }}"}
           - service: input_text.set_value
             target: {entity_id: input_text.harem_line_5}
-            data: {value: "{{ state_attr(list[(idx + 2) % list|length], 'friendly_name') }}"}
+            # Hide Line 5 if list size <= 2
+            data: {value: "{{ state_attr(list[(idx + 2) % list|length], 'friendly_name') if list|length > 2 else '' }}"}
         else:
            - service: input_text.set_value
              target: {entity_id: input_text.harem_line_3}
              data: {value: "Empty Room"}
+           - service: input_text.set_value
+             target: {entity_id: input_text.harem_line_3_status}
+             data: {value: ""}
 ```
 
 ## How to use
