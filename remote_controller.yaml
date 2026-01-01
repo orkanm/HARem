@@ -1,6 +1,7 @@
 substitutions:
   name: "ha-remote"
   friendly_name: "HA Remote Controller"
+  fw_version: "v0.1"
 
 esphome:
   name: harem
@@ -250,7 +251,7 @@ display:
         } else {
           // Waiting Screen (After 3.0s)
           it.print(64, 20, id(font_header), TextAlign::TOP_CENTER, "Waiting...");
-          it.print(64, 50, id(font_small), TextAlign::TOP_CENTER, "v0.1");
+          it.print(64, 50, id(font_small), TextAlign::TOP_CENTER, "${fw_version}");
         }
       }
 
