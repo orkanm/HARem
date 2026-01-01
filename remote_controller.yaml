@@ -58,6 +58,17 @@ wifi:
 
 captive_portal:
 
+# Colors
+color:
+  - id: my_color_white
+    red: 100%
+    green: 100%
+    blue: 100%
+  - id: my_color_black
+    red: 0%
+    green: 0%
+    blue: 0%
+
 # I2C Configuration for OLED
 i2c:
   sda: GPIO5
@@ -99,8 +110,8 @@ binary_sensor:
     name: "Encoder Button"
     id: encoder_button
     on_click:
-      - min_length: 50ms
-        max_length: 350ms
+      - min_length: 10ms
+        max_length: 500ms
         then:
           - logger.log:
               format: "Short Click Detected!"
@@ -138,6 +149,9 @@ text_sensor:
   - platform: homeassistant
     id: remote_line_5
     entity_id: input_text.harem_line_5
+  - platform: homeassistant
+    id: remote_line_3_status
+    entity_id: input_text.harem_line_3_status
 
 sensor:
   - platform: rotary_encoder
@@ -187,20 +201,43 @@ display:
         it.printf(64, 17, id(font_small), TextAlign::TOP_CENTER, "%s", id(remote_line_2).state.c_str());
       }
 
-      // Line 3 (Selected) - y=28 (Centered with Scroll)
-      if (id(remote_line_3).has_state()) {
-        std::string text = id(remote_line_3).state;
+      // Line 3 (Selected) - Split Layout: Name (Scrolls) + Status (Fixed)
+      if (id(remote_line_3).state != "") {
         int x1, y1, width, height;
-        it.get_text_bounds(0, 0, text.c_str(), id(font_header), TextAlign::TOP_LEFT, &x1, &y1, &width, &height);
+        std::string status_text = id(remote_line_3_status).state;
+        int status_width = 0;
         
-        if (width <= 128) {
-          // Fits on screen - Center it
-          it.printf(64, 28, id(font_header), TextAlign::TOP_CENTER, "%s", text.c_str());
+        // 1. Calculate Status Width
+        if (status_text != "") {
+           it.get_text_bounds(0, 0, status_text.c_str(), id(font_small), TextAlign::TOP_LEFT, &x1, &y1, &status_width, &height);
+           status_width += 4; // Add padding
+        }
+
+        int max_name_width = 128 - status_width;
+        
+        // 2. Draw Name (Scrolling logic using max_name_width)
+        std::string name_text = id(remote_line_3).state;
+        int name_width = 0;
+        it.get_text_bounds(0, 0, name_text.c_str(), id(font_header), TextAlign::TOP_LEFT, &x1, &y1, &name_width, &height);
+        
+        if (name_width <= max_name_width) {
+             // Fits in available space - Center it
+             it.print(max_name_width / 2, 28, id(font_header), TextAlign::TOP_CENTER, name_text.c_str());
         } else {
-          // Too long - Scroll it
-          // Speed factor: 40ms/pixel
-          int x = 128 - (millis() / 40) % (width + 128);
-          it.print(x, 28, id(font_header), TextAlign::TOP_LEFT, text.c_str());
+             // Too long - Scroll it
+             // Let's force it to be 0 if it fits, else calculate.
+             int limit = name_width - max_name_width + 30; // 30px pause
+             int step = (millis() / 50) % limit;
+             int x_offset = (step > (name_width - max_name_width)) ? (name_width - max_name_width) : step;
+             
+             it.print(0 - x_offset, 28, id(font_header), TextAlign::TOP_LEFT, name_text.c_str());
+        }
+
+        // 3. Draw Status (Fixed Right)
+        if (status_text != "") {
+           // Clear background for status
+           it.filled_rectangle(128 - status_width, 28, status_width, 14, id(my_color_black));
+           it.print(128, 29, id(font_small), TextAlign::TOP_RIGHT, status_text.c_str());
         }
       } else {
         it.print(64, 28, id(font_header), TextAlign::TOP_CENTER, "Waiting...");
