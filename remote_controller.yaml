@@ -355,6 +355,17 @@ display:
     lambda: |-
       // Draw Interface
       
+      // 00. CHECK FOR HOTSPOT MODE (WiFi Failure)
+      if (id(wifi_component).is_ap_active()) {
+        it.fill(id(my_color_black));
+        it.print(64, 0, id(font_header), id(my_color_white), TextAlign::TOP_CENTER, "WIFI FAILED!");
+        it.print(64, 16, id(font_small), id(my_color_white), TextAlign::TOP_CENTER, "Connect to Hotspot:");
+        it.print(64, 28, id(font_small), id(my_color_white), TextAlign::TOP_CENTER, "Harem Fallback Hotspot");
+        it.print(64, 40, id(font_small), id(my_color_white), TextAlign::TOP_CENTER, "Pass: 12345678");
+        it.print(64, 52, id(font_small), id(my_color_white), TextAlign::TOP_CENTER, "IP: 192.168.4.1");
+        return; 
+      }
+      
       // 0A. CHECK SETTINGS MODE (Local)
       if (id(settings_mode)) {
          it.fill(id(my_color_black));
