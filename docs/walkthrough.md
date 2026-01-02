@@ -71,7 +71,7 @@ sequenceDiagram
 If the remote cannot connect to any configured WiFi network (e.g., you changed your router password or moved to a new house):
 1.  **Wait**: After powering on, wait 60 seconds.
 2.  **Connect**: Look for WiFi named **"Harem Fallback Hotspot"** on your phone/laptop.
-3.  **Password**: Enter `12345678`.
+3.  **Password**: Enter `4jNJPSLAfajjdHh3`.
 4.  **Configure**: A portal should pop up automatically (or go to `192.168.4.1`).
 5.  **Select**: Click your new WiFi network and enter the password. The device will save it and reboot.
 
