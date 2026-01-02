@@ -24,11 +24,11 @@ logger:
 # Enable Home Assistant API
 api:
   encryption:
-    key: "7knRB3/EL4Fq8Foul7Yhv+pcABzyLXHSQxa9bTzzQqg="
+    key: !secret harem_api_key
 
 ota:
   - platform: esphome
-    password: "ad2825446c99da7cb65d49d3f691d24e"
+    password: !secret harem_ota_password
 
 wifi:
   id: wifi_component
@@ -61,7 +61,7 @@ wifi:
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "Harem Fallback Hotspot"
-    password: "S6OlfI3QTLQU"
+    password: !secret harem_ap_password
 
 captive_portal:
 
