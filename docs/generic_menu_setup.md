@@ -210,4 +210,4 @@ action:
 2.  **Navigate**: Rotate to scroll through Rooms.
 3.  **Enter**: Click to enter a Room (lists devices in that Area).
 4.  **Control**: Click to toggle a device.
-5.  **Exit**: Double-Click the knob to go back to the Room list.
+5.  **Exit**: Long Press (>0.3s) the knob to go back to the Room list.

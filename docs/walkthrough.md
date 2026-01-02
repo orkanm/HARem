@@ -58,7 +58,16 @@ sequenceDiagram
 *   **Timeout Logic**: If device state doesn't change in 10s, displays "Failed!".
 *   **Auto-Dismiss**: Overlay vanishes instantly when the new state is confirmed by Home Assistant.
 
-### 6. Final Verification (v0.1)
+### 6. Local Settings Menu
+*   **Access**: Long press knob (>1.5s).
+*   **Controls**: Rotate to Navigate, Click to Edit/Save.
+*   **Features**:
+    *   **Brightness**: Adjust OLED contrast (0-100%).
+    *   **Standby**: Adjust timeout (10-300s).
+    *   **Network Info**: View SSID and IP Address.
+*   **Storage**: Settings persist in flash memory (retained after reboot).
+
+### 7. Final Verification (v0.1)
 - **Startup**: Verified sequence (Splash -> Waiting -> v0.1).
 - **Navigation**: "Back" button reliably returns to previous room.
 - **Display**: Long status strings are truncated; short lists use smart masking to prevent duplicates.
