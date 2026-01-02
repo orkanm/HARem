@@ -31,10 +31,9 @@ jobs:
           echo "2_wifi_password: 'TEST_PASSWORD_2'" >> secrets.yaml
           echo "3_wifi_ssid: 'TEST_SSID_3'" >> secrets.yaml
           echo "3_wifi_password: 'TEST_PASSWORD_3'" >> secrets.yaml
-          echo "api_key: 'BASE64_TEST_KEY_MUST_BE_VALID_LENGTH_='" >> secrets.yaml
-          echo "ota_password: 'TEST_OTA_PASSWORD'" >> secrets.yaml
-          # Note: The API key below is a random valid base64 key for compilation only
-          sed -i 's/key: "7knRB3\/EL4Fq8Foul7Yhv+pcABzyLXHSQxa9bTzzQqg="/key: "7knRB3\/EL4Fq8Foul7Yhv+pcABzyLXHSQxa9bTzzQqg="/' remote_controller.yaml || true
+          echo "harem_api_key: 'BASE64_TEST_KEY_MUST_BE_VALID_LENGTH_='" >> secrets.yaml
+          echo "harem_ota_password: 'TEST_OTA_PASSWORD'" >> secrets.yaml
+          echo "harem_ap_password: '12345678'" >> secrets.yaml
 
       - name: Build Firmware
         run: esphome compile remote_controller.yaml
