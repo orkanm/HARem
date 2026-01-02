@@ -15,6 +15,14 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install ESPHome
+        run: pip install esphome
+
       - name: Create Dummy Secrets
         run: |
           echo "wifi_ssid: 'TEST_SSID'" > secrets.yaml
@@ -29,17 +37,13 @@ jobs:
           sed -i 's/key: "7knRB3\/EL4Fq8Foul7Yhv+pcABzyLXHSQxa9bTzzQqg="/key: "7knRB3\/EL4Fq8Foul7Yhv+pcABzyLXHSQxa9bTzzQqg="/' remote_controller.yaml || true
 
       - name: Build Firmware
-        id: esphome-build
-        uses: esphome/build-action@v1.8.0
-        with:
-          yaml_file: remote_controller.yaml
-          version: latest
+        run: esphome compile remote_controller.yaml
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: firmware-v${{ github.run_number }}
-          path: ${{ steps.esphome-build.outputs.name }}
+          path: .esphome/build/harem/.pioenvs/harem/firmware.bin
 
   release:
     name: Create Release
@@ -50,15 +54,14 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         
-      # Download artifact from previous job requires re-downloading or persisting. 
-      # Simpler to just re-build or assume the build job does the release. 
-      # To keep this simple single-file:
-      
       - name: Download Firmware Artifact
         uses: actions/download-artifact@v4
         with:
           name: firmware-v${{ github.run_number }}
           path: output/
+
+      - name: Rename Firmware
+        run: mv output/firmware.bin output/harem-firmware-${{ github.ref_name }}.bin
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
