@@ -78,9 +78,39 @@ action:
               - variables:
                   entities: "{{ area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | sort }}"
                   selected_entity: "{{ entities[idx % list_size] }}"
+                  friendly: "{{ state_attr(selected_entity, 'friendly_name') }}"
+                  current_state: "{{ states(selected_entity) }}"
+                  new_message: >
+                     {% if current_state == 'on' %} Turning Off...
+                     {% elif current_state == 'off' %} Turning On...
+                     {% else %} Activating... {% endif %}
+              
+              # 1. Show Feedback Logic (Overlay)
+              - service: input_text.set_value
+                target: {entity_id: input_text.harem_overlay}
+                data: {value: "{{ new_message }}"}
+                
+              # 2. Perform Action
               - service: homeassistant.toggle
                 target: {entity_id: "{{ selected_entity }}"}
-              - delay: "00:00:00.5" # Wait for state change to propagate
+              
+              # 3. Wait for State Change (Timeout 10s)
+              - wait_template: "{{ states(selected_entity) != current_state }}"
+                timeout: "00:00:10"
+                
+              # 4. Handle Result
+              - if: "{{ not wait.completed }}"
+                then:
+                  # Timeout occurred
+                  - service: input_text.set_value
+                    target: {entity_id: input_text.harem_overlay}
+                    data: {value: "Failed!"}
+                  - delay: "00:00:02" # Show failure for 2s
+                
+              # 5. Clear Overlay
+              - service: input_text.set_value
+                target: {entity_id: input_text.harem_overlay}
+                data: {value: ""}
 
       # BACK -> Exit Room
       - conditions: "{{ action == 'back' and path != 'ROOT' }}"

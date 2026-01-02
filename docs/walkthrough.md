@@ -46,10 +46,19 @@ sequenceDiagram
 
 ### 3. Navigation Controls
 *   **Rotate**: Scroll Up/Down.
-*   **Click**: Enter Room / Toggle Device. (Short Click detection widened to 10ms-850ms, eliminating dead zones.)
-*   **Long Press (>600ms)**: Back to previous menu.
+*   **Click**: Enter Room / Toggle Device. (Short Click: 10ms - 300ms)
+*   **Long Press (301ms+)**: Back to previous menu. (No dead zone)
 
-### 4. Final Verification (v0.1)
+### 4. Smart Power Management
+*   **Standby Mode**: Display turns off after 60s of inactivity to prevent burn-in.
+*   **Wake-on-Click**: First click only wakes the device (no accidental actions).
+
+### 5. Action Feedback
+*   **Instant Feedback**: "Turning On..." / "Turning Off..." overlay appears immediately on click.
+*   **Timeout Logic**: If device state doesn't change in 10s, displays "Failed!".
+*   **Auto-Dismiss**: Overlay vanishes instantly when the new state is confirmed by Home Assistant.
+
+### 6. Final Verification (v0.1)
 - **Startup**: Verified sequence (Splash -> Waiting -> v0.1).
 - **Navigation**: "Back" button reliably returns to previous room.
 - **Display**: Long status strings are truncated; short lists use smart masking to prevent duplicates.
@@ -74,6 +83,7 @@ You must create these 7 Helpers in HA (`Settings > Devices & Services > Helpers`
 | `input_text.harem_line_3` | Text | Display Line 3 content (Selected). |
 | `input_text.harem_line_4` | Text | Display Line 4 content. |
 | `input_text.harem_line_5` | Text | Display Line 5 content. |
+| `input_text.harem_overlay` | Text | Feedback Screen Message (Pop-up). |
 
 ### 2. Home Assistant Automation
 The logic resides in a single automation.

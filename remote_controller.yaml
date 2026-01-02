@@ -6,6 +6,10 @@ substitutions:
 esphome:
   name: harem
   friendly_name: HARem
+  on_boot:
+    priority: 600
+    then:
+      - script.execute: idle_timer
 
 esp32:
   board: esp32-c3-devkitm-1
@@ -101,7 +105,11 @@ font:
 
 
 # Globals to track state
-# Globals removed - Logic moved to Home Assistant
+globals:
+  - id: is_awake
+    type: bool
+    restore_value: no
+    initial_value: 'true'
 
 # Import Home Assistant Entities
 binary_sensor:
@@ -116,13 +124,21 @@ binary_sensor:
       - min_length: 10ms
         max_length: 300ms
         then:
-          - logger.log:
-              format: "Short Click Detected!"
-              level: INFO
-          - homeassistant.event:
-              event: esphome.remote_action
-              data:
-                action: click
+          - if:
+              condition:
+                lambda: 'return id(is_awake);'
+              then:
+                - script.execute: idle_timer
+                - logger.log:
+                    format: "Short Click Detected!"
+                    level: INFO
+                - homeassistant.event:
+                    event: esphome.remote_action
+                    data:
+                      action: click
+              else:
+                - script.execute: idle_timer
+                - logger.log: "Waking up from sleep"
       - min_length: 301ms
         max_length: 10s
         then:
@@ -152,9 +168,13 @@ text_sensor:
   - platform: homeassistant
     id: remote_line_5
     entity_id: input_text.harem_line_5
+
   - platform: homeassistant
     id: remote_line_3_status
     entity_id: input_text.harem_line_3_status
+  - platform: homeassistant
+    id: remote_overlay
+    entity_id: input_text.harem_overlay
 
 sensor:
   - platform: rotary_encoder
@@ -167,12 +187,14 @@ sensor:
       mode: INPUT_PULLUP
     resolution: 1
     on_clockwise:
+      - script.execute: idle_timer
       - homeassistant.event:
           event: esphome.remote_action
           data:
             action: next
       - component.update: my_display
     on_anticlockwise:
+      - script.execute: idle_timer
       - homeassistant.event:
           event: esphome.remote_action
           data:
@@ -192,6 +214,23 @@ display:
     i2c_id: bus_a
     update_interval: 0.1s
     lambda: |-
+      // Draw Interface
+      
+      // 0. CHECK OVERLAY (Feedback Screen)
+      if (id(remote_overlay).has_state() && id(remote_overlay).state != "") {
+         // Clear screen
+         it.fill(id(my_color_black));
+         
+         // Draw Box
+         it.filled_rectangle(0, 0, 128, 64, id(my_color_black));
+         
+         // Draw Text Centered
+         it.print(64, 25, id(font_header), TextAlign::TOP_CENTER, id(remote_overlay).state.c_str());
+         
+         // Draw spinner/dots? (Optional, let's keep it simple first)
+         return; // Skip drawing the rest
+      }
+
       // Draw Interface - 5 Lines
       
       // Line 1 (Index - 2) - y=6 (Safe from Top Bezel)
@@ -268,3 +307,11 @@ display:
 
 
 # Script removed - Logic moved to Home Assistant
+
+script:
+  - id: idle_timer
+    mode: restart
+    then:
+      - lambda: 'id(my_display).turn_on(); id(is_awake) = true;'
+      - delay: 60s
+      - lambda: 'id(my_display).turn_off(); id(is_awake) = false;'
