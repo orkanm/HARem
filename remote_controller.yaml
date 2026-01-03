@@ -21,6 +21,9 @@ esp32:
 logger:
   level: DEBUG
 
+preferences:
+  flash_write_interval: 10s
+
 # Enable Home Assistant API
 api:
   encryption:
@@ -137,10 +140,10 @@ globals:
   - id: processed_settings_hold
     type: bool
     initial_value: 'false'
-  - id: enable_animations
-    type: bool
+  - id: enable_animations_v2
+    type: int
     restore_value: yes
-    initial_value: 'true'
+    initial_value: '1'
   - id: battery_percent
     type: float
     initial_value: '100.0'
@@ -279,7 +282,7 @@ sensor:
                                changed = true;
                            }
                         } else if (id(settings_index) == 3) { // Animations
-                           id(enable_animations) = !id(enable_animations);
+                           id(enable_animations_v2) = (id(enable_animations_v2) == 1) ? 0 : 1;
                            changed = true;
                         }
                         if (changed) id(my_display).update();
@@ -326,7 +329,7 @@ sensor:
                                changed = true;
                            }
                         } else if (id(settings_index) == 3) { // Animations
-                           id(enable_animations) = !id(enable_animations);
+                           id(enable_animations_v2) = (id(enable_animations_v2) == 1) ? 0 : 1;
                            changed = true;
                         }
                         if (changed) id(my_display).update();
@@ -392,7 +395,7 @@ display:
         
         // Breathing effect for "SLEEPING"
         float pulse = 0;
-        if (id(enable_animations)) pulse = sin(millis() * 0.005) * 5.0; 
+        if (id(enable_animations_v2) == 1) pulse = sin(millis() * 0.005) * 5.0; 
         it.print(64, 4 + pulse, id(font_header), TextAlign::TOP_CENTER, "SLEEPING");
         
         it.printf(64, 34, id(font_count), TextAlign::CENTER, "%d", id(sleep_countdown));
@@ -408,7 +411,7 @@ display:
         if (progress < 0) progress = 0;
         
         it.rectangle(bar_x, bar_y, bar_w, bar_h, id(my_color_white));
-        if (id(enable_animations)) {
+        if (id(enable_animations_v2) == 1) {
             it.filled_rectangle(bar_x, bar_y, (int)(bar_w * progress), bar_h, id(my_color_white));
         } else {
             it.filled_rectangle(bar_x, bar_y, (int)(bar_w * (id(sleep_countdown)/5.0f)), bar_h, id(my_color_white));
@@ -471,9 +474,9 @@ display:
               }
               else if (current_item == 3) { // Animations
                    if (id(edit_mode) && id(settings_index) == 3)
-                      it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Anim: [%s]", id(enable_animations) ? "ON" : "OFF");
+                      it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Anim: [%s]", (id(enable_animations_v2) == 1) ? "ON" : "OFF");
                    else
-                      it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Anim: %s", id(enable_animations) ? "ON" : "OFF");
+                      it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Anim: %s", (id(enable_animations_v2) == 1) ? "ON" : "OFF");
               }
               else if (current_item == 4) { // WiFi
                   if (id(wifi_ssid).has_state())
@@ -500,10 +503,10 @@ display:
          
          // Breathing pulse for feedback text
          float pulse = 0;
-         if (id(enable_animations)) pulse = sin(millis() * 0.008) * 3.0;
+         if (id(enable_animations_v2) == 1) pulse = sin(millis() * 0.008) * 3.0;
          it.print(64, 25 + pulse, id(font_header), TextAlign::TOP_CENTER, id(remote_overlay).state.c_str());
          
-         if (id(enable_animations)) {
+         if (id(enable_animations_v2) == 1) {
            // Small minimalist animated bar
            int bar_w = 40;
            int bar_x = (128 - bar_w) / 2;
@@ -551,12 +554,12 @@ display:
         } else {
           it.fill(id(my_color_black));
           float pulse = 0;
-          if (id(enable_animations)) pulse = sin(millis() * 0.005) * 2.0;
+          if (id(enable_animations_v2) == 1) pulse = sin(millis() * 0.005) * 2.0;
           it.print(64, 15 + pulse, id(font_header), TextAlign::TOP_CENTER, "CONNECTING");
           int container_w = 100;
           int bar_w = 30;
           int start_x = (128 - container_w) / 2;
-          if (id(enable_animations)) {
+          if (id(enable_animations_v2) == 1) {
              int t = (millis() / 8) % 200;
              int pos = (t > 100) ? (200 - t) : t;
              int x_bar = start_x + (int)(pos * (container_w - bar_w) / 100.0f);
