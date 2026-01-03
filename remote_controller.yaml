@@ -261,13 +261,12 @@ sensor:
                        }
                        if (changed) id(my_display).update();
                 else:
-                  # Move Down
+                  # Move Down (Wrapped)
                   - lambda: |-
-                      // Max index 4 (0:Bright, 1:Standby, 2:WiFi, 3:IP, 4:Exit)
-                      if (id(settings_index) < 4) {
-                          id(settings_index)++;
-                          id(my_display).update();
-                      }
+                      // 0:Bright, 1:Standby, 2:WiFi, 3:IP, 4:Exit
+                      id(settings_index)++;
+                      if (id(settings_index) > 4) id(settings_index) = 0;
+                      id(my_display).update();
           else:
             - homeassistant.event:
                 event: esphome.remote_action
@@ -302,12 +301,14 @@ sensor:
                        }
                        if (changed) id(my_display).update();
                 else:
-                  # Move Up
+                  # Move Up (Wrapped)
                   - lambda: |-
-                      if (id(settings_index) > 0) {
+                      if (id(settings_index) == 0) {
+                          id(settings_index) = 4;
+                      } else {
                           id(settings_index)--;
-                          id(my_display).update();
                       }
+                      id(my_display).update();
           else:
             - homeassistant.event:
                 event: esphome.remote_action
@@ -362,14 +363,11 @@ display:
          // 4: Exit
          
          // Draw 3 rows centered around selection
-         int start_idx = id(settings_index) - 1;
+         // Draw 3 rows centered around selection (circularly wrapped)
          
          for (int i = 0; i < 3; i++) {
-             int current_item = start_idx + i;
+             int current_item = (id(settings_index) - 1 + i + 5) % 5;
              int y_pos = y_base + (i * 15);
-             
-             // Skip if out of bounds
-             if (current_item < 0 || current_item > 4) continue;
              
              // Draw Caret
              auto current_font = (id(settings_index) == current_item) ? id(font_header) : id(font_small);
