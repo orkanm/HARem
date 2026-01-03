@@ -103,6 +103,9 @@ font:
   - file: "gfonts://Roboto"
     id: font_small
     size: 10
+  - file: "gfonts://Roboto"
+    id: font_count
+    size: 32
 
 
 
@@ -112,7 +115,7 @@ globals:
     type: bool
     restore_value: no
     initial_value: 'true'
-  - id: standby_duration
+  - id: standby_duration_v2
     type: int
     restore_value: yes
     initial_value: '60'
@@ -138,13 +141,24 @@ globals:
   - id: processed_settings_hold
     type: bool
     initial_value: 'false'
+  - id: battery_percent
+    type: float
+    initial_value: '100.0'
+  - id: sleep_timeout_v2
+    type: int
+    restore_value: yes
+    initial_value: '60'
+  - id: sleep_countdown
+    type: int
+    initial_value: '-1'
 
 # Import Home Assistant Entities
 binary_sensor:
   - platform: gpio
     pin:
-      number: GPIO7
+      number: GPIO4
       mode: INPUT_PULLUP
+      allow_other_uses: true
       inverted: true
     filters:
       - delayed_off: 2ms
@@ -167,11 +181,11 @@ binary_sensor:
             // SHORT CLICK
             if (id(settings_mode)) {
                id(idle_timer)->execute();
-               if (id(settings_index) == 4) {
+               if (id(settings_index) == 5) {
                  ESP_LOGD("main", "Settings Exit item clicked");
                  id(settings_mode) = false;
                  id(edit_mode) = false;
-               } else if (id(settings_index) < 2) {
+               } else if (id(settings_index) < 3) {
                  id(edit_mode) = !id(edit_mode);
                }
             } else {
@@ -255,8 +269,13 @@ sensor:
                               changed = true;
                           }
                        } else if (id(settings_index) == 1) { // Standby
-                          if (id(standby_duration) < 300) {
-                              id(standby_duration) += 10;
+                          if (id(standby_duration_v2) < 300) {
+                              id(standby_duration_v2) += 10;
+                              changed = true;
+                          }
+                       } else if (id(settings_index) == 2) { // Sleep
+                          if (id(sleep_timeout_v2) < 120) {
+                              id(sleep_timeout_v2) += 10;
                               changed = true;
                           }
                        }
@@ -264,9 +283,9 @@ sensor:
                 else:
                   # Move Down (Wrapped)
                   - lambda: |-
-                      // 0:Bright, 1:Standby, 2:WiFi, 3:IP, 4:Exit
+                      // 0:Bright, 1:Standby, 2:Sleep, 3:WiFi, 4:IP, 5:Exit
                       id(settings_index)++;
-                      if (id(settings_index) > 4) id(settings_index) = 0;
+                      if (id(settings_index) > 5) id(settings_index) = 0;
                       id(my_display).update();
           else:
             - homeassistant.event:
@@ -295,8 +314,13 @@ sensor:
                               changed = true;
                           }
                        } else if (id(settings_index) == 1) { // Standby
-                          if (id(standby_duration) > 10) {
-                              id(standby_duration) -= 10;
+                          if (id(standby_duration_v2) > 10) {
+                              id(standby_duration_v2) -= 10;
+                              changed = true;
+                          }
+                       } else if (id(settings_index) == 2) { // Sleep
+                          if (id(sleep_timeout_v2) > 10) {
+                              id(sleep_timeout_v2) -= 10;
                               changed = true;
                           }
                        }
@@ -305,7 +329,7 @@ sensor:
                   # Move Up (Wrapped)
                   - lambda: |-
                       if (id(settings_index) == 0) {
-                          id(settings_index) = 4;
+                          id(settings_index) = 5;
                       } else {
                           id(settings_index)--;
                       }
@@ -322,6 +346,33 @@ sensor:
     id: wifi_signal_sensor
     update_interval: 60s
 
+  - platform: adc
+    pin: GPIO0
+    name: "Battery Voltage"
+    id: battery_voltage_adc
+    update_interval: 60s
+    unit_of_measurement: "V"
+    accuracy_decimals: 2
+    filters:
+      - multiply: 2.0 
+    on_value:
+      then:
+        - lambda: |-
+            id(battery_percent) = (x - 3.2) / (4.2 - 3.2) * 100.0;
+            if (id(battery_percent) > 100) id(battery_percent) = 100;
+            if (id(battery_percent) < 0) id(battery_percent) = 0;
+            id(my_display).update();
+
+deep_sleep:
+  id: sleep_module
+  # Default sleep_duration is infinite (wake by pin)
+  sleep_duration: 1d # Sleep for 1 day if not woken by pin
+  wakeup_pin:
+    number: GPIO4
+    inverted: true
+    mode: INPUT_PULLUP
+    allow_other_uses: true
+
 
 
 
@@ -335,6 +386,13 @@ display:
     lambda: |-
       // Draw Interface
       
+      // 00B. CHECK FOR SLEEP COUNTDOWN
+      if (id(sleep_countdown) > 0) {
+        it.fill(id(my_color_black));
+        it.printf(64, 32, id(font_count), TextAlign::CENTER, "%d", id(sleep_countdown));
+        return;
+      }
+
       // 00. CHECK FOR HOTSPOT MODE (WiFi Failure)
       if (id(wifi_component).is_ap_active()) {
         it.fill(id(my_color_black));
@@ -353,21 +411,25 @@ display:
          
          it.print(64, 0, id(font_small), TextAlign::TOP_CENTER, "- SETTINGS -");
          
+         // Draw Battery % in top right
+         it.printf(127, 0, id(font_small), TextAlign::TOP_RIGHT, "%.0f%%", id(battery_percent));
+         
          int y_base = 20;
          int row_h = 10; // Tighter spacing for more info? No, keep generic 15 but scroll.
          
          // Menu Items:
          // 0: Brightness
          // 1: Standby
-         // 2: WiFi: [SSID]
-         // 3: IP: [IP]
-         // 4: Exit
+         // 2: Sleep
+         // 3: WiFi: [SSID]
+         // 4: IP: [IP]
+          // 5: Exit
          
          // Draw 3 rows centered around selection
          // Draw 3 rows centered around selection (circularly wrapped)
          
          for (int i = 0; i < 3; i++) {
-             int current_item = (id(settings_index) - 1 + i + 5) % 5;
+             int current_item = (id(settings_index) - 1 + i + 6) % 6;
              int y_pos = y_base + (i * 15);
              
              // Draw Caret
@@ -385,23 +447,29 @@ display:
              }
              else if (current_item == 1) { // Standby
                  if (id(edit_mode) && id(settings_index) == 1)
-                    it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Standby: [%ds]", id(standby_duration));
+                    it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Standby: [%ds]", id(standby_duration_v2));
                  else
-                    it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Standby: %ds", id(standby_duration));
+                    it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Standby: %ds", id(standby_duration_v2));
              }
-             else if (current_item == 2) { // WiFi
+              else if (current_item == 2) { // Sleep (New)
+                  if (id(edit_mode) && id(settings_index) == 2)
+                     it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Sleep: [%ds]", id(sleep_timeout_v2));
+                  else
+                     it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Sleep: %ds", id(sleep_timeout_v2));
+              }
+             else if (current_item == 3) { // WiFi
                  if (id(wifi_ssid).has_state())
                     it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "WiFi: %s", id(wifi_ssid).state.c_str());
                  else
                     it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "WiFi: Scanning...");
              }
-             else if (current_item == 3) { // IP
+             else if (current_item == 4) { // IP
                  if (id(wifi_ip).has_state())
                     it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "IP: %s", id(wifi_ip).state.c_str());
                  else
                     it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "IP: N/A");
              }
-             else if (current_item == 4) { // Exit
+             else if (current_item == 5) { // Exit
                  it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "Exit");
              }
          }
@@ -504,9 +572,25 @@ script:
   - id: idle_timer
     mode: restart
     then:
-      - lambda: 'id(my_display).turn_on(); id(is_awake) = true;'
-      - delay: !lambda 'return id(standby_duration) * 1000;'
+      - lambda: 'id(my_display).turn_on(); id(is_awake) = true; id(sleep_countdown) = -1;'
+      - delay: !lambda 'return id(standby_duration_v2) * 1000;'
       - lambda: 'id(my_display).turn_off(); id(is_awake) = false;'
+      - delay: !lambda |-
+          int total_ms = id(sleep_timeout_v2) * 1000;
+          return (total_ms > 5000) ? (total_ms - 5000) : 0;
+      - lambda: 'id(sleep_countdown) = 5; id(my_display).turn_on(); id(my_display).update();'
+      - delay: 1s
+      - lambda: 'id(sleep_countdown) = 4; id(my_display).update();'
+      - delay: 1s
+      - lambda: 'id(sleep_countdown) = 3; id(my_display).update();'
+      - delay: 1s
+      - lambda: 'id(sleep_countdown) = 2; id(my_display).update();'
+      - delay: 1s
+      - lambda: 'id(sleep_countdown) = 1; id(my_display).update();'
+      - delay: 1s
+      - lambda: 'id(sleep_countdown) = -1; id(my_display).turn_off();'
+      - logger.log: "Entering Deep Sleep..."
+      - deep_sleep.enter: sleep_module
 
   - id: send_click_event
     mode: restart
