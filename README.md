@@ -3,9 +3,7 @@
 **HARem** is a high-performance, minimalist "Thin Client" remote controller designed for the modern smart home. Built on the **ESPHome** ecosystem and powered by the **ESP32-C3**, it provides a boutique-quality physical interface that prioritizes speed, aesthetics, and zero-maintenance operation.
 
 ## 📛 The Name
-The name **HARem** is a clever portmanteau of **H**ome **A**ssistant and **Rem**ote, but its inspiration runs deeper into Turkish history and culture.
-
-In the Ottoman Empire, the **Harem** represented the most private, sacred, and protected "inner sanctum" of the household. Just as the historical Harem was the heart of the home, this remote serves as the private, primary interface to control and protect the sanctity of your modern smart home.
+**HARem** is a clever portmanteau of **H**ome **A**ssistant and **Rem**ote. Its inspiration is rooted in Turkish history, representing the "inner sanctum" of the home. See [ABOUT.md](ABOUT.md) for the full story.
 
 ## 🏛️ Architecture: The "Thin Client" Philosophy
 Unlike traditional smart remotes that require manual configuration of every button, HARem operates as a dynamic viewport into your Home Assistant instance.
