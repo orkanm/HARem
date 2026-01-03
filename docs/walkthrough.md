@@ -102,9 +102,14 @@ You must create these 7 Helpers in HA (`Settings > Devices & Services > Helpers`
 | `input_text.harem_line_5` | Text | Display Line 5 content. |
 | `input_text.harem_overlay` | Text | Feedback Screen Message (Pop-up). |
 
-### 2. Home Assistant Automation
-The logic resides in a single automation.
-**[View Complete Automation YAML](file:///home/orquitto/.gemini/antigravity/brain/7f522ab7-53ba-4a4e-868a-fc69c6b557ff/generic_menu_setup.md)**
+### 2. Home Assistant Automation (Blueprint)
+For the easiest setup, use the **Blueprint**:
+1.  Copy the content of [harem_remote.yaml](file:///home/orquitto/Workspace/HARem/blueprints/harem_remote.yaml) into your Home Assistant `/config/blueprints/automation/` folder.
+2.  Go to **Settings > Automations & Scenes > Blueprints**.
+3.  Click **Create Automation** next to "HARem: Universal ESPHome Remote Controller".
+4.  Select your helpers from the dropdowns and click **Save**.
+
+**[View Advanced Automation YAML (Manual)](file:///home/orquitto/Workspace/HARem/docs/generic_menu_setup.md)**
 
 ### 3. ESPHome Firmware
 The firmware handles hardware debouncing, display rendering, and event transmission.
