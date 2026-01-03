@@ -88,8 +88,21 @@ If the remote cannot connect to any configured WiFi network (e.g., you changed y
 
 ## Setup Guide
 
-### 1. Home Assistant Helpers
-You must create these 7 Helpers in HA (`Settings > Devices & Services > Helpers`):
+### 1. Home Assistant Setup (Pick 1 of 3 Methods)
+
+#### ✅ Option A: One-Click Package (Professional)
+The fastest method. Creates all 7 helpers and the automation controller in one go.
+1. Copy [harem_package.yaml](file:///home/orquitto/Workspace/HARem/home_assistant/harem_package.yaml) to your Home Assistant `/config/packages/` folder.
+2. In `configuration.yaml`, ensure you have: `homeassistant: { packages: !include_dir_named packages }`.
+3. Restart Home Assistant. **Done.**
+
+#### 🛠 Option B: Blueprint (UI-Friendly)
+1. Copy [harem_remote.yaml](file:///home/orquitto/Workspace/HARem/blueprints/harem_remote.yaml) to `/config/blueprints/automation/`.
+2. **Manually create** the 7 Helpers listed below.
+3. Import the Blueprint in **Settings > Automations > Blueprints**.
+
+#### 🧪 Option C: Manual Configuration
+Create these 7 Helpers manually in **Settings > Helpers**:
 
 | Helper Entity ID | Type | Purpose |
 | :--- | :--- | :--- |

@@ -3,6 +3,16 @@
 This guide turns your Remote into a universal browser for your Home Assistant "Areas".
 It requires **no maintenance**—if you add a device to a Room in Home Assistant, it appears on the remote automatically.
 
+> [!TIP]
+> **New! One-Click Setup**
+> * **[Download One-Click Package](file:///home/orquitto/Workspace/HARem/home_assistant/harem_package.yaml)** - Best for power users. Drop one file in, everything works.
+> * **[Import Blueprint](file:///home/orquitto/Workspace/HARem/blueprints/harem_remote.yaml)** - Best for UI users. Pick your helpers from a dropdown.
+
+---
+
+## Manual Configuration Guide
+If you prefer to set up everything manually or customize the logic, follow the steps below.
+
 ## 1. Create Helpers (Home Assistant)
 Go to **Settings > Devices & Services > Helpers** and create these:
 

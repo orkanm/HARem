@@ -1,0 +1,184 @@
+# HARem: Home Assistant Remote - One-Click Package
+# Drop this file into your 'packages' folder in Home Assistant.
+# Ensure you have 'packages: !include_dir_named packages' in your configuration.yaml
+
+input_text:
+  harem_menu_path:
+    name: "Remote: Menu Path"
+    initial: "ROOT"
+  harem_line_1:
+    name: "Remote: Line 1"
+  harem_line_2:
+    name: "Remote: Line 2"
+  harem_line_3:
+    name: "Remote: Line 3"
+  harem_line_4:
+    name: "Remote: Line 4"
+  harem_line_5:
+    name: "Remote: Line 5"
+  harem_line_3_status:
+    name: "Remote: Line 3 Status"
+  harem_overlay:
+    name: "Remote: Overlay"
+
+input_number:
+  harem_menu_index:
+    name: "Remote: Menu Index"
+    min: 0
+    max: 1000
+    step: 1
+    mode: box
+
+automation:
+  - alias: "HARem: Generic Menu Controller"
+    description: "Handles generic menu navigation for ESPHome Remote (5 Lines)"
+    mode: queued
+    max: 10
+    trigger:
+      - platform: event
+        event_type: esphome.remote_action
+    action:
+      # 1. HANDLE ACTION
+      - variables:
+          action: "{{ trigger.event.data.action }}"
+          path: "{{ states('input_text.harem_menu_path') }}" 
+          idx: "{{ states('input_number.harem_menu_index') | int }}"
+          
+      - variables:
+          list_size: >
+            {% if path == 'ROOT' or path == '' %} {{ areas() | length }}
+            {% else %} {{ area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | list | length }} {% endif %}
+
+      - choose:
+          # CLICK -> Enter/Toggle
+          - conditions: "{{ action == 'click' and list_size > 0 }}"
+            sequence:
+              - if: "{{ path == 'ROOT' or path == '' }}"
+                then:
+                  - variables:
+                      areas_list: "{{ areas() | sort }}"
+                      selected_area: "{{ areas_list[idx % list_size] }}"
+                  - service: input_text.set_value
+                    target: {entity_id: input_text.harem_menu_path}
+                    data: {value: "{{ selected_area }}"}
+                  - service: input_number.set_value
+                    target: {entity_id: input_number.harem_menu_index}
+                    data: {value: 0}
+                else:
+                  - variables:
+                      entities: "{{ area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | sort }}"
+                      selected_entity: "{{ entities[idx % list_size] }}"
+                      current_state: "{{ states(selected_entity) }}"
+                      new_message: >
+                         {% if current_state == 'on' %} Turning Off...
+                         {% elif current_state == 'off' %} Turning On...
+                         {% else %} Activating... {% endif %}
+                  
+                  - service: input_text.set_value
+                    target: {entity_id: input_text.harem_overlay}
+                    data: {value: "{{ new_message }}"}
+                    
+                  - service: homeassistant.toggle
+                    target: {entity_id: "{{ selected_entity }}"}
+                  
+                  - wait_template: "{{ states(selected_entity) != current_state }}"
+                    timeout: "00:00:10"
+                    
+                  - if: "{{ not wait.completed }}"
+                    then:
+                      - service: input_text.set_value
+                        target: {entity_id: input_text.harem_overlay}
+                        data: {value: "Failed!"}
+                      - delay: "00:00:02"
+                    
+                  - service: input_text.set_value
+                    target: {entity_id: input_text.harem_overlay}
+                    data: {value: ""}
+
+          # ROTATE -> Change Index
+          - conditions: "{{ action == 'next' and list_size > 0 }}"
+            sequence:
+              - service: input_number.set_value
+                target: {entity_id: input_number.harem_menu_index}
+                data: {value: "{{ (idx + 1) % list_size }}"}
+                
+          - conditions: "{{ action == 'prev' and list_size > 0 }}"
+            sequence:
+              - service: input_number.set_value
+                target: {entity_id: input_number.harem_menu_index}
+                data: {value: "{{ (idx - 1) % list_size }}"}
+
+          # BACK -> Exit Room
+          - conditions: "{{ action == 'back' and path != 'ROOT' }}"
+            sequence:
+              - variables:
+                  sorted_areas: "{{ areas() | sort }}"
+                  restore_idx: "{{ sorted_areas.index(path) if path in sorted_areas else 0 }}"
+              - service: input_number.set_value
+                target: {entity_id: input_number.harem_menu_index}
+                data: {value: "{{ restore_idx }}"}
+              - service: input_text.set_value
+                target: {entity_id: input_text.harem_menu_path}
+                data: {value: "ROOT"}
+
+      # 2. UPDATE DISPLAY
+      - variables:
+          path: "{{ states('input_text.harem_menu_path') }}" 
+          idx: "{{ states('input_number.harem_menu_index') | int }}"
+      
+      - if: "{{ path == 'ROOT' or path == '' }}"
+        then:
+          - variables:
+              list: "{{ areas() | sort }}"
+          - if: "{{ list | length > 0 }}"
+            then:
+              - service: input_text.set_value
+                target: {entity_id: input_text.harem_line_1}
+                data: {value: "{{ area_name(list[(idx - 2) % list|length]) if list|length > 2 else '' }}"}
+              - service: input_text.set_value
+                target: {entity_id: input_text.harem_line_2}
+                data: {value: "{{ area_name(list[(idx - 1) % list|length]) if list|length > 1 else '' }}"}
+              - service: input_text.set_value
+                target: {entity_id: input_text.harem_line_3}
+                data: {value: "> {{ area_name(list[idx % list|length]) }}"}
+              - service: input_text.set_value
+                target: {entity_id: input_text.harem_line_3_status}
+                data: {value: ""}
+              - service: input_text.set_value
+                target: {entity_id: input_text.harem_line_4}
+                data: {value: "{{ area_name(list[(idx + 1) % list|length]) if list|length > 1 else '' }}"}
+              - service: input_text.set_value
+                target: {entity_id: input_text.harem_line_5}
+                data: {value: "{{ area_name(list[(idx + 2) % list|length]) if list|length > 2 else '' }}"}
+            else:
+               - service: input_text.set_value
+                 target: {entity_id: input_text.harem_line_3}
+                 data: {value: "No Areas Found"}
+
+        else:
+          - variables:
+              list: "{{ area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | sort }}"
+          - if: "{{ list | length > 0 }}"
+            then:
+              - service: input_text.set_value
+                target: {entity_id: input_text.harem_line_1}
+                data: {value: "{{ state_attr(list[(idx - 2) % list|length], 'friendly_name') if list|length > 2 else '' }}"}
+              - service: input_text.set_value
+                target: {entity_id: input_text.harem_line_2}
+                data: {value: "{{ state_attr(list[(idx - 1) % list|length], 'friendly_name') if list|length > 1 else '' }}"}
+              - service: input_text.set_value
+                target: {entity_id: input_text.harem_line_3}
+                data: {value: "> {{ state_attr(list[idx % list|length], 'friendly_name') }}"}
+              - service: input_text.set_value
+                target: {entity_id: input_text.harem_line_3_status}
+                data: {value: "({{ states(list[idx % list|length]) | truncate(12, True, '..') }})" }
+              - service: input_text.set_value
+                target: {entity_id: input_text.harem_line_4}
+                data: {value: "{{ state_attr(list[(idx + 1) % list|length], 'friendly_name') if list|length > 1 else '' }}"}
+              - service: input_text.set_value
+                target: {entity_id: input_text.harem_line_5}
+                data: {value: "{{ state_attr(list[(idx + 2) % list|length], 'friendly_name') if list|length > 2 else '' }}"}
+            else:
+               - service: input_text.set_value
+                 target: {entity_id: input_text.harem_line_3}
+                 data: {value: "Empty Room"}
