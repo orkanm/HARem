@@ -135,6 +135,9 @@ globals:
   - id: press_time
     type: uint32_t
     initial_value: '0'
+  - id: processed_settings_hold
+    type: bool
+    initial_value: 'false'
 
 # Import Home Assistant Entities
 binary_sensor:
@@ -148,12 +151,17 @@ binary_sensor:
     name: "Encoder Button"
     id: encoder_button
     on_press:
-      - lambda: 'id(press_time) = millis();'
-    on_release:
       - lambda: |-
-          uint32_t duration = millis() - id(press_time);
+          id(press_time) = millis();
+          id(processed_settings_hold) = false;
+      - script.execute: handle_settings_hold
+    on_release:
+      - script.stop: handle_settings_hold
+      - lambda: |-
+          if (id(processed_settings_hold)) return;
           
-          if (duration < 10) return; // Ultra-short noise floor
+          uint32_t duration = millis() - id(press_time);
+          if (duration < 10) return; // Debounce
           
           if (duration < 700) {
             // SHORT CLICK
@@ -174,16 +182,13 @@ binary_sensor:
             }
           } else if (duration >= 1000 && duration < 3500) {
             // BACK ACTION
-            if (!id(settings_mode)) {
+            if (id(settings_mode)) {
+               ESP_LOGD("main", "Exiting Settings via 1s hold");
+               id(settings_mode) = false;
+               id(edit_mode) = false;
+            } else {
                id(send_back_event)->execute();
             }
-          } else if (duration >= 5000) {
-            // SETTINGS MENU
-            id(settings_mode) = !id(settings_mode);
-            id(edit_mode) = false;
-            id(settings_index) = 0;
-            id(my_display).turn_on();
-            id(is_awake) = true;
           }
 
 
@@ -523,3 +528,15 @@ script:
           event: esphome.remote_action
           data:
             action: back
+
+  - id: handle_settings_hold
+    then:
+      - delay: 5s
+      - lambda: |-
+          id(processed_settings_hold) = true;
+          id(settings_mode) = !id(settings_mode);
+          ESP_LOGD("main", "Auto-Settings Hold: settings_mode is now %s", id(settings_mode) ? "ON" : "OFF");
+          id(edit_mode) = false;
+          id(settings_index) = 0;
+          id(my_display).turn_on();
+          id(is_awake) = true;
