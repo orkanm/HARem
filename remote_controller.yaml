@@ -163,11 +163,12 @@ binary_sensor:
           uint32_t duration = millis() - id(press_time);
           if (duration < 10) return; // Debounce
           
-          if (duration < 700) {
+          if (duration < 800) {
             // SHORT CLICK
             if (id(settings_mode)) {
                id(idle_timer)->execute();
                if (id(settings_index) == 4) {
+                 ESP_LOGD("main", "Settings Exit item clicked");
                  id(settings_mode) = false;
                  id(edit_mode) = false;
                } else if (id(settings_index) < 2) {
@@ -180,7 +181,7 @@ binary_sensor:
                  id(idle_timer)->execute();
                }
             }
-          } else if (duration >= 1000 && duration < 3500) {
+          } else if (duration >= 800 && duration < 3500) {
             // BACK ACTION
             if (id(settings_mode)) {
                ESP_LOGD("main", "Exiting Settings via 1s hold");
@@ -529,7 +530,7 @@ script:
 
   - id: handle_settings_hold
     then:
-      - delay: 5s
+      - delay: 4s
       - lambda: |-
           id(processed_settings_hold) = true;
           id(settings_mode) = !id(settings_mode);
