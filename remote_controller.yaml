@@ -132,6 +132,9 @@ globals:
     type: bool
     restore_value: no
     initial_value: 'false'
+  - id: press_time
+    type: uint32_t
+    initial_value: '0'
 
 # Import Home Assistant Entities
 binary_sensor:
@@ -140,79 +143,49 @@ binary_sensor:
       number: GPIO7
       mode: INPUT_PULLUP
       inverted: true
+    filters:
+      - delayed_off: 2ms
     name: "Encoder Button"
     id: encoder_button
-    on_click:
-      - min_length: 10ms
-        max_length: 300ms
-        then:
-          - if:
-              condition:
-                lambda: 'return id(settings_mode);'
-              then:
-                # SETTINGS MODE CLICK
-                - script.execute: idle_timer
-                - if:
-                    condition:
-                      # Exit is now index 4
-                      lambda: 'return id(settings_index) == 4;'
-                    then:
-                      - globals.set:
-                          id: settings_mode
-                          value: 'false'
-                      - globals.set:
-                          id: edit_mode
-                          value: 'false'
-                    else:
-                      # Only toggle edit mode for index 0 (Brightness) and 1 (Standby)
-                      - if:
-                          condition:
-                             lambda: 'return id(settings_index) < 2;'
-                          then:
-                             - lambda: 'id(edit_mode) = !id(edit_mode);'
-                      # Save to flash immediately on exit edit? ESPHome does this periodically or on shutdown usually.
-                      # We can force save if critical, but standard restore_value handles it.
+    on_press:
+      - lambda: 'id(press_time) = millis();'
+    on_release:
+      - lambda: |-
+          uint32_t duration = millis() - id(press_time);
+          
+          if (duration < 10) return; // Ultra-short noise floor
+          
+          if (duration < 700) {
+            // SHORT CLICK
+            if (id(settings_mode)) {
+               id(idle_timer)->execute();
+               if (id(settings_index) == 4) {
+                 id(settings_mode) = false;
+                 id(edit_mode) = false;
+               } else if (id(settings_index) < 2) {
+                 id(edit_mode) = !id(edit_mode);
+               }
+            } else {
+               if (id(is_awake)) {
+                 id(send_click_event)->execute();
+               } else {
+                 id(idle_timer)->execute();
+               }
+            }
+          } else if (duration >= 1000 && duration < 3500) {
+            // BACK ACTION
+            if (!id(settings_mode)) {
+               id(send_back_event)->execute();
+            }
+          } else if (duration >= 5000) {
+            // SETTINGS MENU
+            id(settings_mode) = !id(settings_mode);
+            id(edit_mode) = false;
+            id(settings_index) = 0;
+            id(my_display).turn_on();
+            id(is_awake) = true;
+          }
 
-              else:
-                # NORMAL MODE CLICK
-                - if:
-                    condition:
-                      lambda: 'return id(is_awake);'
-                    then:
-                      - script.execute: idle_timer
-                      - logger.log: "Short Click Detected!"
-                      - homeassistant.event:
-                          event: esphome.remote_action
-                          data:
-                            action: click
-                    else:
-                      # WAKE UP
-                      - script.execute: idle_timer
-                      - logger.log: "Waking up from sleep"
-
-      - min_length: 301ms
-        max_length: 1500ms
-        then:
-          - if:
-              condition:
-                lambda: 'return !id(settings_mode);'
-              then:
-                - logger.log: "Back Action Detected!"
-                - homeassistant.event:
-                    event: esphome.remote_action
-                    data:
-                      action: back
-
-      - min_length: 1501ms
-        max_length: 10s
-        then:
-          - logger.log: "Toggle Settings Mode"
-          - lambda: |-
-               id(settings_mode) = !id(settings_mode);
-               id(edit_mode) = false;
-               id(settings_index) = 0;
-               id(my_display).turn_on();
-               id(is_awake) = true;
 
   # Status sensors removed - Managed by Home Assistant text
     
@@ -530,3 +503,23 @@ script:
       - lambda: 'id(my_display).turn_on(); id(is_awake) = true;'
       - delay: !lambda 'return id(standby_duration) * 1000;'
       - lambda: 'id(my_display).turn_off(); id(is_awake) = false;'
+
+  - id: send_click_event
+    mode: restart
+    then:
+      - script.execute: idle_timer
+      - logger.log: "SUCCESS: Click Sent to HA"
+      - homeassistant.event:
+          event: esphome.remote_action
+          data:
+            action: click
+
+  - id: send_back_event
+    mode: restart
+    then:
+      - script.execute: idle_timer
+      - logger.log: "SUCCESS: Back Sent to HA"
+      - homeassistant.event:
+          event: esphome.remote_action
+          data:
+            action: back
