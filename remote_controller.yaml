@@ -500,17 +500,19 @@ display:
       
       // 0B. CHECK OVERLAY (Feedback Screen)
       if (id(remote_overlay).has_state() && id(remote_overlay).state != "") {
-         // Clear screen
          it.fill(id(my_color_black));
          
-         // Draw Box
-         it.filled_rectangle(0, 0, 128, 64, id(my_color_black));
+         // Breathing pulse for feedback text
+         float pulse = sin(millis() * 0.008) * 3.0;
+         it.print(64, 25 + pulse, id(font_header), TextAlign::TOP_CENTER, id(remote_overlay).state.c_str());
          
-         // Draw Text Centered
-         it.print(64, 25, id(font_header), TextAlign::TOP_CENTER, id(remote_overlay).state.c_str());
+         // Small minimalist animated bar
+         int bar_w = 40;
+         int bar_x = (128 - bar_w) / 2;
+         float bar_pulse = (sin(millis() * 0.008) + 1.0) / 2.0; // 0.0 to 1.0
+         it.line(bar_x, 45, bar_x + (int)(bar_w * bar_pulse), 45, id(my_color_white));
          
-         // Draw spinner/dots? (Optional, let's keep it simple first)
-         return; // Skip drawing the rest
+         return;
       }
 
       // Draw Interface - 5 Lines
@@ -546,22 +548,21 @@ display:
         
         if (name_width <= max_name_width) {
              // Fits in available space - Center it
-             it.print(max_name_width / 2, 28, id(font_header), TextAlign::TOP_CENTER, name_text.c_str());
+             it.print(max_name_width / 2, 28, id(font_header), id(my_color_white), TextAlign::TOP_CENTER, name_text.c_str());
         } else {
              // Too long - Scroll it
-             // Let's force it to be 0 if it fits, else calculate.
-             int limit = name_width - max_name_width + 30; // 30px pause
+             int limit = name_width - max_name_width + 30;
              int step = (millis() / 50) % limit;
              int x_offset = (step > (name_width - max_name_width)) ? (name_width - max_name_width) : step;
              
-             it.print(0 - x_offset, 28, id(font_header), TextAlign::TOP_LEFT, name_text.c_str());
+             it.print(0 - x_offset, 28, id(font_header), id(my_color_white), TextAlign::TOP_LEFT, name_text.c_str());
         }
 
         // 3. Draw Status (Fixed Right)
         if (status_text != "") {
            // Clear background for status
            it.filled_rectangle(128 - status_width, 28, status_width, 14, id(my_color_black));
-           it.print(128, 29, id(font_small), TextAlign::TOP_RIGHT, status_text.c_str());
+           it.print(128, 29, id(font_small), id(my_color_white), TextAlign::TOP_RIGHT, status_text.c_str());
         }
       } else {
         if (millis() < 3000) {
@@ -570,8 +571,26 @@ display:
           it.print(64, 25, id(font_small), TextAlign::TOP_CENTER, "HomeAssistant Remote");
           it.print(64, 40, id(font_small), TextAlign::TOP_CENTER, "Controller");
         } else {
-          // Waiting Screen (After 3.0s)
-          it.print(64, 20, id(font_header), TextAlign::TOP_CENTER, "Waiting...");
+          // Connecting Animation (After 3.0s)
+          it.fill(id(my_color_black));
+          
+          // Pulsing "CONNECTING" text
+          float pulse = sin(millis() * 0.005) * 2.0;
+          it.print(64, 15 + pulse, id(font_header), TextAlign::TOP_CENTER, "CONNECTING");
+          
+          // Ping-pong loading bar
+          int container_w = 100;
+          int bar_w = 30;
+          int start_x = (128 - container_w) / 2;
+          
+          // Calculate ping-pong position (0 to 100)
+          int t = (millis() / 8) % 200;
+          int pos = (t > 100) ? (200 - t) : t;
+          int x_bar = start_x + (int)(pos * (container_w - bar_w) / 100.0f);
+          
+          it.rectangle(start_x, 40, container_w, 3, id(my_color_white));
+          it.filled_rectangle(x_bar, 40, bar_w, 3, id(my_color_white));
+          
           it.print(64, 50, id(font_small), TextAlign::TOP_CENTER, "${fw_version}");
         }
       }
