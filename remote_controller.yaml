@@ -141,6 +141,10 @@ globals:
   - id: processed_settings_hold
     type: bool
     initial_value: 'false'
+  - id: enable_animations
+    type: bool
+    restore_value: yes
+    initial_value: 'true'
   - id: battery_percent
     type: float
     initial_value: '100.0'
@@ -184,11 +188,11 @@ binary_sensor:
             // SHORT CLICK
             if (id(settings_mode)) {
                id(idle_timer)->execute();
-               if (id(settings_index) == 5) {
+               if (id(settings_index) == 6) {
                  ESP_LOGD("main", "Settings Exit item clicked");
                  id(settings_mode) = false;
                  id(edit_mode) = false;
-               } else if (id(settings_index) < 3) {
+               } else if (id(settings_index) < 4) {
                  id(edit_mode) = !id(edit_mode);
                }
             } else {
@@ -394,7 +398,8 @@ display:
         it.fill(id(my_color_black));
         
         // Breathing effect for "SLEEPING"
-        float pulse = sin(millis() * 0.005) * 5.0; // Subtle move
+        float pulse = 0;
+        if (id(enable_animations)) pulse = sin(millis() * 0.005) * 5.0; 
         it.print(64, 4 + pulse, id(font_header), TextAlign::TOP_CENTER, "SLEEPING");
         
         it.printf(64, 34, id(font_count), TextAlign::CENTER, "%d", id(sleep_countdown));
@@ -410,7 +415,11 @@ display:
         if (progress < 0) progress = 0;
         
         it.rectangle(bar_x, bar_y, bar_w, bar_h, id(my_color_white));
-        it.filled_rectangle(bar_x, bar_y, (int)(bar_w * progress), bar_h, id(my_color_white));
+        if (id(enable_animations)) {
+            it.filled_rectangle(bar_x, bar_y, (int)(bar_w * progress), bar_h, id(my_color_white));
+        } else {
+            it.filled_rectangle(bar_x, bar_y, (int)(bar_w * (id(sleep_countdown)/5.0f)), bar_h, id(my_color_white));
+        }
         
         return;
       }
@@ -575,7 +584,8 @@ display:
           it.fill(id(my_color_black));
           
           // Pulsing "CONNECTING" text
-          float pulse = sin(millis() * 0.005) * 2.0;
+          float pulse = 0;
+          if (id(enable_animations)) pulse = sin(millis() * 0.005) * 2.0;
           it.print(64, 15 + pulse, id(font_header), TextAlign::TOP_CENTER, "CONNECTING");
           
           // Ping-pong loading bar
@@ -583,13 +593,18 @@ display:
           int bar_w = 30;
           int start_x = (128 - container_w) / 2;
           
-          // Calculate ping-pong position (0 to 100)
-          int t = (millis() / 8) % 200;
-          int pos = (t > 100) ? (200 - t) : t;
-          int x_bar = start_x + (int)(pos * (container_w - bar_w) / 100.0f);
-          
-          it.rectangle(start_x, 40, container_w, 3, id(my_color_white));
-          it.filled_rectangle(x_bar, 40, bar_w, 3, id(my_color_white));
+          if (id(enable_animations)) {
+             // Calculate ping-pong position (0 to 100)
+             int t = (millis() / 8) % 200;
+             int pos = (t > 100) ? (200 - t) : t;
+             int x_bar = start_x + (int)(pos * (container_w - bar_w) / 100.0f);
+             
+             it.rectangle(start_x, 40, container_w, 3, id(my_color_white));
+             it.filled_rectangle(x_bar, 40, bar_w, 3, id(my_color_white));
+          } else {
+             it.rectangle(start_x, 40, container_w, 3, id(my_color_white));
+             it.filled_rectangle(start_x + (container_w - bar_w)/2, 40, bar_w, 3, id(my_color_white));
+          }
           
           it.print(64, 50, id(font_small), TextAlign::TOP_CENTER, "${fw_version}");
         }
