@@ -85,7 +85,7 @@ i2c:
 
 # Font configuration
 font:
-  - file: "gfonts://Roboto"
+  - file: "gfonts://Outfit"
     id: font_main
     size: 14
   - file: "gfonts://Material Icons"
@@ -97,13 +97,13 @@ font:
       - "\U0000E335" # power_off (was mdi-lightbulb-off? using close/off)
       - "\U0000E02C" # movie
       - "\U0000E63C" # power (plug)
-  - file: "gfonts://Roboto"
+  - file: "gfonts://Montserrat"
     id: font_header
-    size: 12
-  - file: "gfonts://Roboto"
+    size: 13
+  - file: "gfonts://Outfit"
     id: font_small
     size: 10
-  - file: "gfonts://Roboto"
+  - file: "gfonts://Bebas Neue"
     id: font_count
     size: 32
 
@@ -151,6 +151,9 @@ globals:
   - id: sleep_countdown
     type: int
     initial_value: '-1'
+  - id: sleep_start_ms
+    type: uint32_t
+    initial_value: '0'
 
 # Import Home Assistant Entities
 binary_sensor:
@@ -389,7 +392,26 @@ display:
       // 00B. CHECK FOR SLEEP COUNTDOWN
       if (id(sleep_countdown) > 0) {
         it.fill(id(my_color_black));
-        it.printf(64, 32, id(font_count), TextAlign::CENTER, "%d", id(sleep_countdown));
+        
+        // Breathing effect for "SLEEPING"
+        float pulse = sin(millis() * 0.005) * 5.0; // Subtle move
+        it.print(64, 4 + pulse, id(font_header), TextAlign::TOP_CENTER, "SLEEPING");
+        
+        it.printf(64, 34, id(font_count), TextAlign::CENTER, "%d", id(sleep_countdown));
+        
+        // Smooth Progress Bar
+        int bar_w = 80;
+        int bar_h = 4;
+        int bar_x = (128 - bar_w) / 2;
+        int bar_y = 54;
+        
+        uint32_t elapsed = millis() - id(sleep_start_ms);
+        float progress = 1.0f - (elapsed / 5000.0f);
+        if (progress < 0) progress = 0;
+        
+        it.rectangle(bar_x, bar_y, bar_w, bar_h, id(my_color_white));
+        it.filled_rectangle(bar_x, bar_y, (int)(bar_w * progress), bar_h, id(my_color_white));
+        
         return;
       }
 
@@ -578,7 +600,7 @@ script:
       - delay: !lambda |-
           int total_ms = id(sleep_timeout_v2) * 1000;
           return (total_ms > 5000) ? (total_ms - 5000) : 0;
-      - lambda: 'id(sleep_countdown) = 5; id(my_display).turn_on(); id(my_display).update();'
+      - lambda: 'id(sleep_countdown) = 5; id(sleep_start_ms) = millis(); id(my_display).turn_on(); id(my_display).update();'
       - delay: 1s
       - lambda: 'id(sleep_countdown) = 4; id(my_display).update();'
       - delay: 1s
