@@ -67,7 +67,7 @@ blueprint:
   
 
 mode: queued
-max: 10
+max: 20
 
 trigger:
   - platform: event
@@ -82,9 +82,15 @@ action:
       path: "{{ states(path_entity) }}" 
       idx: "{{ states(idx_entity) | int }}"
       guest_switch_entity: !input guest_mode_switch
-      guest_ents: !input guest_included_entities
+      guest_ents_raw: !input guest_included_entities
       
   - variables:
+      guest_ents: >
+        {% if guest_ents_raw is string %}
+          {{ [guest_ents_raw] }}
+        {% else %}
+          {{ guest_ents_raw }}
+        {% endif %}
       list_size: >
         {% set gm = guest_switch_entity %}
         {% set is_guest = is_state(gm, 'on') if gm != 'none' else false %}
@@ -129,6 +135,13 @@ action:
         sequence:
           - service: input_boolean.toggle
             target: {entity_id: !input guest_mode_switch}
+          # Force nav back to ROOT to avoid being stuck in a restricted room
+          - service: input_text.set_value
+            target: {entity_id: !input menu_path}
+            data: {value: "ROOT"}
+          - service: input_number.set_value
+            target: {entity_id: !input menu_index}
+            data: {value: 0}
           - variables:
               new_state: "{{ 'ON' if is_state(guest_switch_entity, 'on') else 'OFF' }}"
           - service: input_text.set_value
@@ -137,6 +150,19 @@ action:
           - delay: "00:00:02"
           - service: input_text.set_value
             target: {entity_id: !input overlay}
+            data: {value: ""}
+          - service: input_text.set_value
+            target: {entity_id: !input line_5}
+            data: {value: ""}
+
+      # NEW: Handle clear_overlay
+      - conditions: "{{ action == 'clear_overlay' }}"
+        sequence:
+          - service: input_text.set_value
+            target: {entity_id: !input overlay}
+            data: {value: ""}
+          - service: input_text.set_value
+            target: {entity_id: !input line_5}
             data: {value: ""}
 
       # CLICK -> Enter/Toggle
@@ -211,6 +237,79 @@ action:
               - service: input_text.set_value
                 target: {entity_id: !input overlay}
                 data: {value: ""}
+              - service: input_text.set_value
+                target: {entity_id: !input line_5}
+                data: {value: ""}
+
+      # ROTATE HOLD -> Brightness / Volume Control
+      - conditions: "{{ (action == 'rotate_cw_hold' or action == 'rotate_ccw_hold') and path != 'ROOT' and path != '' }}"
+        sequence:
+          - variables:
+              start_idx: "{{ states(idx_entity) | int }}"
+              gm: "{{ guest_switch_entity }}"
+              is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
+              entities: >
+                {% set base = area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | list %}
+                {% if is_guest %}
+                  {{ base | select('in', guest_ents) | list | sort }}
+                {% else %}
+                  {{ base | sort }}
+                {% endif %}
+              selected_entity: "{{ entities[start_idx % list_size] }}"
+              domain: "{{ selected_entity.split('.')[0] }}"
+              step: "{{ 10 if action == 'rotate_cw_hold' else -10 }}"
+              line_5_ent: !input line_5
+              current_pct: >
+                 {% set val = states(line_5_ent) %}
+                 {% set stored = val | int(-1) %}
+                 {% if stored >= 0 and val != '' and val != 'unknown' %}
+                   {{ stored }}
+                 {% elif domain == 'light' %}
+                   {{ (state_attr(selected_entity, 'brightness') | int(0) / 2.55) | round(0) }}
+                 {% elif domain == 'media_player' %}
+                   {{ state_attr(selected_entity, 'volume_level') | float(0) * 100 }}
+                 {% else %} 0 {% endif %}
+              new_pct: >
+                 {% set val = (current_pct | float) + (step | int) %}
+                 {{ 100 if val > 100 else (0 if val < 0 else val) }}
+              
+          - choose:
+              # LIGHTS
+              - conditions: "{{ domain == 'light' }}"
+                sequence:
+                  - service: light.turn_on
+                    target: { entity_id: "{{ selected_entity }}" }
+                    data:
+                      brightness_step_pct: "{{ step }}"
+                      transition: 0.1
+                  - service: input_text.set_value
+                    target: { entity_id: !input overlay }
+                    data:
+                      value: >
+                        {% if new_pct | int >= 100 %}MAX 100%{% elif new_pct | int <= 0 %}MIN 0%{% else %}Bright {{ new_pct | int }}%{% endif %}
+                  - service: input_text.set_value
+                    target: { entity_id: !input line_5 }
+                    data:
+                      value: "{{ new_pct | int }}"
+              
+              # MEDIA PLAYERS (Volume)
+              - conditions: "{{ domain == 'media_player' }}"
+                sequence:
+                  - service: media_player.volume_set
+                    target: { entity_id: "{{ selected_entity }}" }
+                    data:
+                      volume_level: "{{ (state_attr(selected_entity, 'volume_level') | float(0)) + (step / 100.0) }}"
+                  - service: input_text.set_value
+                    target: { entity_id: !input overlay }
+                    data:
+                      value: >
+                        {% if new_pct | int >= 100 %}MAX 100%{% elif new_pct | int <= 0 %}MIN 0%{% else %}Vol {{ new_pct | int }}%{% endif %}
+                  - service: input_text.set_value
+                    target: { entity_id: !input line_5 }
+                    data:
+                      value: "{{ new_pct | int }}"
+
+          - delay: 0.05
 
       # BACK -> Exit Room
       - conditions: "{{ action == 'back' and path != 'ROOT' }}"
@@ -298,7 +397,32 @@ action:
             data: {value: "> {{ state_attr(list[idx % list|length], 'friendly_name') }}"}
           - service: input_text.set_value
             target: {entity_id: !input line_3_status}
-            data: {value: "({{ states(list[idx % list|length]) | truncate(12, True, '..') }})" }
+            data:
+              value: >
+                {% set entity = list[idx % list|length] %}
+                {% set dom = entity.split('.')[0] %}
+                {% set ns = namespace(can_dim=false) %}
+                {% if dom == 'light' %}
+                  {# Check for brightness support bit 0x01 (1) #}
+                  {% if (state_attr(entity, 'supported_features') | int(0) | bitwise_and(1)) > 0 %}
+                    {% set ns.can_dim = true %}
+                  {% endif %}
+                  {# Check unique color modes #}
+                  {% set modes = state_attr(entity, 'supported_color_modes') %}
+                  {% if modes %}
+                    {% for m in modes %}
+                      {% if m != 'onoff' %}
+                         {% set ns.can_dim = true %}
+                      {% endif %}
+                    {% endfor %}
+                  {% endif %}
+                {% elif dom == 'media_player' %}
+                   {# Check for volume_set bit 0x04 (4) #}
+                   {% if (state_attr(entity, 'supported_features') | int(0) | bitwise_and(4)) > 0 %}
+                     {% set ns.can_dim = true %}
+                   {% endif %}
+                {% endif %}
+                ({{ states(entity) | truncate(12, True, '..') }}){{ ' *' if ns.can_dim else '' }}
           - service: input_text.set_value
             target: {entity_id: !input line_4}
             data: {value: "{{ state_attr(list[(idx + 1) % list|length], 'friendly_name') if list|length > 1 else '' }}"}
