@@ -128,7 +128,7 @@ font:
     size: 32
   - file: "gfonts://Outfit"
     id: font_medium
-    size: 22
+    size: 18
 
 # Globals to track state
 globals:
@@ -193,6 +193,16 @@ globals:
   - id: ota_progress
     type: int
     initial_value: '0'
+  - id: stored_pin
+    type: int
+    restore_value: yes
+    initial_value: '00'
+  - id: pin_change_stage
+    type: int
+    initial_value: '0' # 0=Idle, 1=VerifyOld, 2=SetNew, 3=ConfirmNew
+  - id: temp_new_pin
+    type: int
+    initial_value: '0'
 
 # Import Home Assistant Entities
 binary_sensor:
@@ -230,25 +240,64 @@ binary_sensor:
             if (id(settings_mode)) {
                id(idle_timer)->execute();
                
-               // PIN MODE CLICK
+
+               // PIN MODE CLICK (Guest Unlock & PIN Change)
                if (id(guest_pin_mode)) {
-                  if (id(input_pin) == 12) { // Hardcoded PIN
-                      id(send_toggle_guest_event)->execute();
-                      id(guest_pin_mode) = false;
+                  // MODE A: Unlock Guest Mode
+                  if (!id(pin_change_stage)) {
+                      if (id(input_pin) == id(stored_pin)) {
+                          id(send_toggle_guest_event)->execute();
+                          id(guest_pin_mode) = false;
+                          id(pin_error_state) = false;
+                          id(settings_mode) = false;
+                      } else {
+                          id(pin_error_state) = true;
+                          id(input_pin) = 0;
+                      }
+                      id(my_display).update();
+                      return;
+                  } 
+                  
+                  // MODE B: Change PIN Flow
+                  if (id(pin_change_stage) == 1) { // Verify Old
+                      if (id(input_pin) == id(stored_pin)) {
+                          id(pin_change_stage) = 2; // Success -> Go to New
+                          id(input_pin) = 0;
+                          id(pin_error_state) = false;
+                      } else {
+                          id(pin_error_state) = true;
+                          id(input_pin) = 0;
+                      }
+                  } else if (id(pin_change_stage) == 2) { // Set New
+                      id(temp_new_pin) = id(input_pin); // STORE TEMP
+                      id(pin_change_stage) = 3; // Go to Confirm
+                      id(input_pin) = 0;
                       id(pin_error_state) = false;
-                      id(settings_mode) = false; // Exit menu on success
-                  } else {
-                      id(pin_error_state) = true;
-                      id(input_pin) = 0; // Reset
+                  } else if (id(pin_change_stage) == 3) { // Confirm New
+                      if (id(input_pin) == id(temp_new_pin)) {
+                          id(stored_pin) = id(temp_new_pin); // SAVE!
+                          id(pin_change_stage) = 4; // Show Success
+                          id(pin_success_sequence)->execute();
+                      } else {
+                          id(pin_error_state) = true; // MATCH FAIL
+                          id(input_pin) = 0;
+                          // Optional: Reset to Stage 2? Keeping at 3 for retry.
+                      }
                   }
                   id(my_display).update();
                   return;
                }
 
-               if (id(settings_index) == 7) { // Exit
+               if (id(settings_index) == 8) { // Exit (Now at Index 8)
                  id(settings_mode) = false;
                  id(edit_mode) = false;
                  id(my_display).update();
+               } else if (id(settings_index) == 5) { // Change PIN
+                  id(guest_pin_mode) = true;
+                  id(pin_change_stage) = 1; // Start Verify Flow
+                  id(input_pin) = 0;
+                  id(pin_error_state) = false;
+                  id(my_display).update();
                } else if (id(settings_index) == 4) { // Guest Mode toggle
                  if (id(guest_mode_state).state) {
                     // IF ON: Require PIN to turn OFF
@@ -375,9 +424,9 @@ sensor:
                  else:
                    # Move Down (Wrapped)
                    - lambda: |-
-                       // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:Guest, 5:WiFi, 6:IP, 7:Exit
+                       // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:Guest, 5:ChangePIN, 6:SSID, 7:IP, 8:Exit
                        id(settings_index)++;
-                       if (id(settings_index) > 7) id(settings_index) = 0;
+                       if (id(settings_index) > 8) id(settings_index) = 0;
                        id(my_display).update();
           else:
             - homeassistant.event:
@@ -545,20 +594,37 @@ display:
       
 
       
-      // 00C. PIN ENTRY OVERLAY
+      // 00C. PIN ENTRY OVERLAY & CHANGE FLOW
       if (id(guest_pin_mode)) {
           it.fill(id(my_color_black));
           it.rectangle(10, 10, 108, 44, id(my_color_white));
           it.filled_rectangle(10, 10, 108, 14, id(my_color_white));
-          it.print(64, 11, id(font_small), id(my_color_black), TextAlign::TOP_CENTER, "SECURITY CHECK");
           
-          if (id(pin_error_state)) {
-             it.print(64, 35, id(font_medium), TextAlign::CENTER, "WRONG PIN!");
+          if (id(pin_change_stage) == 1) {
+              it.print(64, 11, id(font_small), id(my_color_black), TextAlign::TOP_CENTER, "VERIFY OLD PIN");
+          } else if (id(pin_change_stage) == 2) {
+              it.print(64, 11, id(font_small), id(my_color_black), TextAlign::TOP_CENTER, "SET NEW PIN");
+          } else if (id(pin_change_stage) == 3) {
+              it.print(64, 11, id(font_small), id(my_color_black), TextAlign::TOP_CENTER, "CONFIRM PIN");
+          } else if (id(pin_change_stage) == 4) {
+              it.print(64, 11, id(font_small), id(my_color_black), TextAlign::TOP_CENTER, "SUCCESS");
           } else {
-             it.printf(64, 35, id(font_medium), TextAlign::CENTER, "%02d", id(input_pin));
+              it.print(64, 11, id(font_small), id(my_color_black), TextAlign::TOP_CENTER, "SECURITY CHECK");
           }
           
-          it.print(64, 63, id(font_small), TextAlign::BOTTOM_CENTER, "Rotate & Click (12)");
+          if (id(pin_error_state)) {
+             if (id(pin_change_stage) == 3)
+                it.print(64, 35, id(font_medium), TextAlign::CENTER, "NO MATCH");
+             else
+                it.print(64, 35, id(font_medium), TextAlign::CENTER, "WRONG!");
+          } else {
+             if (id(pin_change_stage) == 4)
+                it.print(64, 35, id(font_medium), TextAlign::CENTER, "PIN SAVED");
+             else
+                it.printf(64, 35, id(font_medium), TextAlign::CENTER, "%02d", id(input_pin));
+          }
+          
+          it.print(64, 63, id(font_small), TextAlign::BOTTOM_CENTER, "Rotate & Click");
           return;
       }
       
@@ -575,7 +641,7 @@ display:
          int y_base = 20;
          
          for (int i = 0; i < 3; i++) {
-              int current_item = (id(settings_index) - 1 + i + 8) % 8;
+              int current_item = (id(settings_index) - 1 + i + 9) % 9;
               int y_pos = y_base + (i * 15);
               
               // Draw Caret
@@ -612,19 +678,22 @@ display:
               else if (current_item == 4) { // Guest Mode
                    it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Guest: %s", id(guest_mode_state).state ? "ON" : "OFF");
               }
-              else if (current_item == 5) { // WiFi
+              else if (current_item == 5) { // Change PIN
+                  it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "Change PIN >");
+              }
+              else if (current_item == 6) { // WiFi
                   if (id(wifi_ssid).has_state())
                      it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "WiFi: %s", id(wifi_ssid).state.c_str());
                   else
                      it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "WiFi: Scanning...");
               }
-              else if (current_item == 6) { // IP
+              else if (current_item == 7) { // IP
                   if (id(wifi_ip).has_state())
                      it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "IP: %s", id(wifi_ip).state.c_str());
                   else
                      it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "IP: N/A");
               }
-              else if (current_item == 7) { // Exit
+              else if (current_item == 8) { // Exit
                   it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "Exit");
               }
          }
@@ -774,3 +843,12 @@ script:
           id(settings_index) = 0;
           id(my_display).turn_on();
           id(is_awake) = true;
+
+  - id: pin_success_sequence
+    then:
+      - delay: 1.5s
+      - lambda: |-
+          id(guest_pin_mode) = false;
+          id(pin_change_stage) = 0;
+          id(settings_mode) = false;
+          id(my_display).update();
