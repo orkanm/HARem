@@ -50,6 +50,21 @@ blueprint:
       selector:
         entity:
           domain: input_text
+    guest_mode_switch:
+      name: Guest Mode Switch
+      description: "input_boolean to track Guest Mode"
+      default: none
+      selector:
+        entity:
+          domain: input_boolean
+    guest_included_entities:
+      name: "[Guest Mode] Allowed Entities"
+      description: "Select ALL entities that should be visible in Guest Mode. The areas containing these entities will be automatically allowed."
+      default: []
+      selector:
+        entity:
+          multiple: true
+  
 
 mode: queued
 max: 10
@@ -66,11 +81,34 @@ action:
       idx_entity: !input menu_index
       path: "{{ states(path_entity) }}" 
       idx: "{{ states(idx_entity) | int }}"
+      guest_switch_entity: !input guest_mode_switch
+      guest_ents: !input guest_included_entities
       
   - variables:
       list_size: >
-        {% if path == 'ROOT' or path == '' %} {{ areas() | length }}
-        {% else %} {{ area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | list | length }} {% endif %}
+        {% set gm = guest_switch_entity %}
+        {% set is_guest = is_state(gm, 'on') if gm != 'none' else false %}
+        {% if path == 'ROOT' or path == '' %}
+          {% if is_guest %}
+             {% set ns = namespace(areas=[]) %}
+             {% for ent in guest_ents %}
+               {% set a = area_id(ent) %}
+               {% if a != none and a not in ns.areas %}
+                 {% set ns.areas = ns.areas + [a] %}
+               {% endif %}
+             {% endfor %}
+             {{ ns.areas | length }}
+          {% else %}
+             {{ areas() | length }}
+          {% endif %}
+        {% else %}
+          {% set entities = area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | list %}
+          {% if is_guest %}
+            {{ entities | select('in', guest_ents) | list | length }}
+          {% else %}
+            {{ entities | length }}
+          {% endif %}
+        {% endif %}
 
   - choose:
       # ROTATE -> Change Index
@@ -86,13 +124,42 @@ action:
             target: {entity_id: !input menu_index}
             data: {value: "{{ (idx - 1) % list_size }}"}
 
+      # NEW: Handle toggle_guest from remote settings
+      - conditions: "{{ action == 'toggle_guest' }}"
+        sequence:
+          - service: input_boolean.toggle
+            target: {entity_id: !input guest_mode_switch}
+          - variables:
+              new_state: "{{ 'ON' if is_state(guest_switch_entity, 'on') else 'OFF' }}"
+          - service: input_text.set_value
+            target: {entity_id: !input overlay}
+            data: {value: "Guest Mode: {{ new_state }}"}
+          - delay: "00:00:02"
+          - service: input_text.set_value
+            target: {entity_id: !input overlay}
+            data: {value: ""}
+
       # CLICK -> Enter/Toggle
       - conditions: "{{ action == 'click' and list_size > 0 }}"
         sequence:
           - if: "{{ path == 'ROOT' or path == '' }}"
             then:
               - variables:
-                  areas_list: "{{ areas() | sort }}"
+                  gm: "{{ guest_switch_entity }}"
+                  is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
+                  areas_list: >
+                    {% if is_guest %}
+                       {% set ns = namespace(areas=[]) %}
+                       {% for ent in guest_ents %}
+                         {% set a = area_id(ent) %}
+                         {% if a != none and a not in ns.areas %}
+                           {% set ns.areas = ns.areas + [a] %}
+                         {% endif %}
+                       {% endfor %}
+                       {{ ns.areas | sort }}
+                    {% else %}
+                       {{ areas() | sort }}
+                    {% endif %}
                   selected_area: "{{ areas_list[idx % list_size] }}"
               - service: input_text.set_value
                 target: {entity_id: !input menu_path}
@@ -102,7 +169,15 @@ action:
                 data: {value: 0}
             else:
               - variables:
-                  entities: "{{ area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | sort }}"
+                  gm: "{{ guest_switch_entity }}"
+                  is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
+                  entities: >
+                    {% set base = area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | list %}
+                    {% if is_guest %}
+                      {{ base | select('in', guest_ents) | list | sort }}
+                    {% else %}
+                      {{ base | sort }}
+                    {% endif %}
                   selected_entity: "{{ entities[idx % list_size] }}"
                   friendly: "{{ state_attr(selected_entity, 'friendly_name') }}"
                   current_state: "{{ states(selected_entity) }}"
@@ -154,11 +229,26 @@ action:
   - variables:
       path: "{{ states(path_entity) }}" 
       idx: "{{ states(idx_entity) | int }}"
+      guest_ents: !input guest_included_entities
   
   - if: "{{ path == 'ROOT' or path == '' }}"
     then:
       - variables:
-          list: "{{ areas() | sort }}"
+          gm: "{{ guest_switch_entity }}"
+          is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
+          list: >
+            {% if is_guest %}
+               {% set ns = namespace(areas=[]) %}
+               {% for ent in guest_ents %}
+                 {% set a = area_id(ent) %}
+                 {% if a != none and a not in ns.areas %}
+                   {% set ns.areas = ns.areas + [a] %}
+                 {% endif %}
+               {% endfor %}
+               {{ ns.areas | sort }}
+            {% else %}
+               {{ areas() | sort }}
+            {% endif %}
       - if: "{{ list | length > 0 }}"
         then:
           - service: input_text.set_value
@@ -186,7 +276,15 @@ action:
 
     else:
       - variables:
-          list: "{{ area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | sort }}"
+          gm: "{{ guest_switch_entity }}"
+          is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
+          list: >
+            {% set base = area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | list %}
+            {% if is_guest %}
+              {{ base | select('in', guest_ents) | list | sort }}
+            {% else %}
+              {{ base | sort }}
+            {% endif %}
       - if: "{{ list | length > 0 }}"
         then:
           - service: input_text.set_value

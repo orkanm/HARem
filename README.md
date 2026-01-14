@@ -23,6 +23,7 @@ Unlike traditional smart remotes that require manual configuration of every butt
 ## ✨ Premium Features
 - **Modern UI**: A 5-line OLED interface featuring **Outfit** and **Montserrat** typography for a professional, high-end feel.
 - **Dynamic Marquee**: Long device names automatically scroll with a smooth marquee effect.
+- **Guest Mode Protection**: Secure, PIN-protected "Guest Mode" to restrict access to specific areas or devices.
 - **Visual Feedback**: Interactive animations for startup, sleep countdowns, and action confirmations.
 - **Power Intelligence**: Configurable standby and deep-sleep modes with precise battery voltage monitoring.
 - **Global Control**: Toggle animations and power settings directly from a local on-device menu.

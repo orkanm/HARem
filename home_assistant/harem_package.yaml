@@ -21,6 +21,11 @@ input_text:
   harem_overlay:
     name: "Remote: Overlay"
 
+input_boolean:
+  harem_guest_mode:
+    name: "Remote: Guest Mode"
+    icon: mdi:account-lock
+
 input_number:
   harem_menu_index:
     name: "Remote: Menu Index"
@@ -46,8 +51,19 @@ automation:
           
       - variables:
           list_size: >
-            {% if path == 'ROOT' or path == '' %} {{ areas() | length }}
-            {% else %} {{ area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | list | length }} {% endif %}
+            {% set is_guest = is_state('input_boolean.harem_guest_mode', 'on') %}
+            {% if path == 'ROOT' or path == '' %}
+              {% set areas_list = label_areas('harem_guest') if is_guest else areas() %}
+              {{ areas_list | length }}
+            {% else %}
+              {% set entities = area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | list %}
+              {% if is_guest %}
+                {% set guest_entities = label_entities('harem_guest') %}
+                {{ entities | select('in', guest_entities) | list | length }}
+              {% else %}
+                {{ entities | length }}
+              {% endif %}
+            {% endif %}
 
       - choose:
           # CLICK -> Enter/Toggle
@@ -56,7 +72,10 @@ automation:
               - if: "{{ path == 'ROOT' or path == '' }}"
                 then:
                   - variables:
-                      areas_list: "{{ areas() | sort }}"
+                      is_guest: "{{ is_state('input_boolean.harem_guest_mode', 'on') }}"
+                      areas_list: >
+                        {% set base = label_areas('harem_guest') if is_guest else areas() %}
+                        {{ base | sort }}
                       selected_area: "{{ areas_list[idx % list_size] }}"
                   - service: input_text.set_value
                     target: {entity_id: input_text.harem_menu_path}
@@ -66,7 +85,15 @@ automation:
                     data: {value: 0}
                 else:
                   - variables:
-                      entities: "{{ area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | sort }}"
+                      is_guest: "{{ is_state('input_boolean.harem_guest_mode', 'on') }}"
+                      entities: >
+                        {% set base = area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | list %}
+                        {% if is_guest %}
+                          {% set guest_entities = label_entities('harem_guest') %}
+                          {{ base | select('in', guest_entities) | list | sort }}
+                        {% else %}
+                          {{ base | sort }}
+                        {% endif %}
                       selected_entity: "{{ entities[idx % list_size] }}"
                       current_state: "{{ states(selected_entity) }}"
                       new_message: >
@@ -108,6 +135,21 @@ automation:
                 target: {entity_id: input_number.harem_menu_index}
                 data: {value: "{{ (idx - 1) % list_size }}"}
 
+          # NEW: Handle toggle_guest from remote settings
+          - conditions: "{{ action == 'toggle_guest' }}"
+            sequence:
+              - service: input_boolean.toggle
+                target: {entity_id: input_boolean.harem_guest_mode}
+              - variables:
+                  new_state: "{{ 'ON' if is_state('input_boolean.harem_guest_mode', 'on') else 'OFF' }}"
+              - service: input_text.set_value
+                target: {entity_id: input_text.harem_overlay}
+                data: {value: "Guest Mode: {{ new_state }}"}
+              - delay: "00:00:02"
+              - service: input_text.set_value
+                target: {entity_id: input_text.harem_overlay}
+                data: {value: ""}
+
           # BACK -> Exit Room
           - conditions: "{{ action == 'back' and path != 'ROOT' }}"
             sequence:
@@ -129,7 +171,10 @@ automation:
       - if: "{{ path == 'ROOT' or path == '' }}"
         then:
           - variables:
-              list: "{{ areas() | sort }}"
+              is_guest: "{{ is_state('input_boolean.harem_guest_mode', 'on') }}"
+              list: >
+                {% set base = label_areas('harem_guest') if is_guest else areas() %}
+                {{ base | sort }}
           - if: "{{ list | length > 0 }}"
             then:
               - service: input_text.set_value
@@ -157,7 +202,15 @@ automation:
 
         else:
           - variables:
-              list: "{{ area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | sort }}"
+              is_guest: "{{ is_state('input_boolean.harem_guest_mode', 'on') }}"
+              list: >
+                {% set base = area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | list %}
+                {% if is_guest %}
+                  {% set guest_entities = label_entities('harem_guest') %}
+                  {{ base | select('in', guest_entities) | list | sort }}
+                {% else %}
+                  {{ base | sort }}
+                {% endif %}
           - if: "{{ list | length > 0 }}"
             then:
               - service: input_text.set_value

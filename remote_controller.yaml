@@ -81,6 +81,7 @@ color:
 i2c:
   sda: GPIO5
   scl: GPIO6
+  frequency: 900kHz
   scan: true
   id: bus_a
 
@@ -107,6 +108,9 @@ font:
   - file: "gfonts://Bebas Neue"
     id: font_count
     size: 32
+  - file: "gfonts://Outfit"
+    id: font_medium
+    size: 22
 
 # Globals to track state
 globals:
@@ -156,10 +160,22 @@ globals:
     initial_value: '-1'
   - id: sleep_start_ms
     type: uint32_t
+  - id: guest_pin_mode
+    type: bool
+    initial_value: 'false'
+  - id: input_pin
+    type: int
     initial_value: '0'
+  - id: pin_error_state
+    type: bool
+    initial_value: 'false'
 
 # Import Home Assistant Entities
 binary_sensor:
+  - platform: homeassistant
+    id: guest_mode_state
+    entity_id: input_boolean.harem_guest_mode
+
   - platform: gpio
     pin:
       number: GPIO4
@@ -171,12 +187,14 @@ binary_sensor:
     name: "Encoder Button"
     id: encoder_button
     on_press:
+      - script.stop: idle_timer
       - lambda: |-
           id(press_time) = millis();
           id(processed_settings_hold) = false;
       - script.execute: handle_settings_hold
     on_release:
       - script.stop: handle_settings_hold
+      - script.execute: idle_timer
       - lambda: |-
           if (id(processed_settings_hold)) return;
           
@@ -187,12 +205,40 @@ binary_sensor:
             // SHORT CLICK
             if (id(settings_mode)) {
                id(idle_timer)->execute();
-               if (id(settings_index) == 6) {
-                 ESP_LOGD("main", "Settings Exit item clicked");
+               
+               // PIN MODE CLICK
+               if (id(guest_pin_mode)) {
+                  if (id(input_pin) == 12) { // Hardcoded PIN
+                      id(send_toggle_guest_event)->execute();
+                      id(guest_pin_mode) = false;
+                      id(pin_error_state) = false;
+                      id(settings_mode) = false; // Exit menu on success
+                  } else {
+                      id(pin_error_state) = true;
+                      id(input_pin) = 0; // Reset
+                  }
+                  id(my_display).update();
+                  return;
+               }
+
+               if (id(settings_index) == 7) { // Exit
                  id(settings_mode) = false;
                  id(edit_mode) = false;
-               } else if (id(settings_index) < 4) {
+                 id(my_display).update();
+               } else if (id(settings_index) == 4) { // Guest Mode toggle
+                 if (id(guest_mode_state).state) {
+                    // IF ON: Require PIN to turn OFF
+                    id(guest_pin_mode) = true;
+                    id(input_pin) = 0;
+                    id(pin_error_state) = false;
+                    id(my_display).update();
+                 } else {
+                    // IF OFF: Toggle freely
+                    id(send_toggle_guest_event)->execute();
+                 }
+               } else if (id(settings_index) < 4) { // Editable items
                  id(edit_mode) = !id(edit_mode);
+                 id(my_display).update();
                }
             } else {
                if (id(is_awake)) {
@@ -204,9 +250,14 @@ binary_sensor:
           } else if (duration >= 800 && duration < 3500) {
             // BACK ACTION
             if (id(settings_mode)) {
-               ESP_LOGD("main", "Exiting Settings via 1s hold");
-               id(settings_mode) = false;
-               id(edit_mode) = false;
+               if (id(guest_pin_mode)) {
+                   id(guest_pin_mode) = false; // Cancel PIN
+                   id(my_display).update();
+               } else {
+                   ESP_LOGD("main", "Exiting Settings via 1s hold");
+                   id(settings_mode) = false;
+                   id(edit_mode) = false;
+               }
             } else {
                id(send_back_event)->execute();
             }
@@ -223,15 +274,15 @@ text_sensor:
     id: remote_line_3
     entity_id: input_text.harem_line_3
   - platform: homeassistant
+    id: remote_line_3_status
+    entity_id: input_text.harem_line_3_status
+  - platform: homeassistant
     id: remote_line_4
     entity_id: input_text.harem_line_4
   - platform: homeassistant
     id: remote_line_5
     entity_id: input_text.harem_line_5
 
-  - platform: homeassistant
-    id: remote_line_3_status
-    entity_id: input_text.harem_line_3_status
   - platform: homeassistant
     id: remote_overlay
     entity_id: input_text.harem_overlay
@@ -241,6 +292,8 @@ text_sensor:
       id: wifi_ip
     ssid:
       id: wifi_ssid
+
+
 
 sensor:
   - platform: rotary_encoder
@@ -260,7 +313,16 @@ sensor:
           then:
              - if:
                  condition:
-                   lambda: 'return id(edit_mode);'
+                   lambda: 'return id(guest_pin_mode);'
+                 then:
+                   - lambda: |-
+                       id(input_pin)++;
+                       if (id(input_pin) > 99) id(input_pin) = 0;
+                       id(pin_error_state) = false; 
+                       id(my_display).update();
+             - if:
+                 condition:
+                   lambda: 'return (id(edit_mode) && !id(guest_pin_mode));'
                  then:
                    # Adjust Value (+)
                     - lambda: |-
@@ -289,9 +351,9 @@ sensor:
                  else:
                    # Move Down (Wrapped)
                    - lambda: |-
-                       // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:WiFi, 5:IP, 6:Exit
+                       // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:Guest, 5:WiFi, 6:IP, 7:Exit
                        id(settings_index)++;
-                       if (id(settings_index) > 6) id(settings_index) = 0;
+                       if (id(settings_index) > 7) id(settings_index) = 0;
                        id(my_display).update();
           else:
             - homeassistant.event:
@@ -307,7 +369,16 @@ sensor:
           then:
              - if:
                  condition:
-                   lambda: 'return id(edit_mode);'
+                   lambda: 'return id(guest_pin_mode);'
+                 then:
+                   - lambda: |-
+                       id(input_pin)--;
+                       if (id(input_pin) < 0) id(input_pin) = 99;
+                       id(pin_error_state) = false;
+                       id(my_display).update();
+             - if:
+                 condition:
+                   lambda: 'return (id(edit_mode) && !id(guest_pin_mode));'
                  then:
                    # Adjust Value (-)
                     - lambda: |-
@@ -337,7 +408,7 @@ sensor:
                    # Move Up (Wrapped)
                    - lambda: |-
                        if (id(settings_index) == 0) {
-                           id(settings_index) = 6;
+                           id(settings_index) = 7;
                        } else {
                            id(settings_index)--;
                        }
@@ -429,6 +500,25 @@ display:
         it.print(64, 40, id(font_small), id(my_color_white), TextAlign::TOP_CENTER, "Pass: 4jNJPSLAfajjdHh3");
         it.print(64, 52, id(font_small), id(my_color_white), TextAlign::TOP_CENTER, "IP: 192.168.4.1");
         return; 
+      } 
+      
+
+      
+      // 00C. PIN ENTRY OVERLAY
+      if (id(guest_pin_mode)) {
+          it.fill(id(my_color_black));
+          it.rectangle(10, 10, 108, 44, id(my_color_white));
+          it.filled_rectangle(10, 10, 108, 14, id(my_color_white));
+          it.print(64, 11, id(font_small), id(my_color_black), TextAlign::TOP_CENTER, "SECURITY CHECK");
+          
+          if (id(pin_error_state)) {
+             it.print(64, 35, id(font_medium), TextAlign::CENTER, "WRONG PIN!");
+          } else {
+             it.printf(64, 35, id(font_medium), TextAlign::CENTER, "%02d", id(input_pin));
+          }
+          
+          it.print(64, 63, id(font_small), TextAlign::BOTTOM_CENTER, "Rotate & Click (12)");
+          return;
       }
       
       // 0A. CHECK SETTINGS MODE (Local)
@@ -444,7 +534,7 @@ display:
          int y_base = 20;
          
          for (int i = 0; i < 3; i++) {
-              int current_item = (id(settings_index) - 1 + i + 7) % 7;
+              int current_item = (id(settings_index) - 1 + i + 8) % 8;
               int y_pos = y_base + (i * 15);
               
               // Draw Caret
@@ -478,19 +568,22 @@ display:
                    else
                       it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Anim: %s", (id(enable_animations_v2) == 1) ? "ON" : "OFF");
               }
-              else if (current_item == 4) { // WiFi
+              else if (current_item == 4) { // Guest Mode
+                   it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Guest: %s", id(guest_mode_state).state ? "ON" : "OFF");
+              }
+              else if (current_item == 5) { // WiFi
                   if (id(wifi_ssid).has_state())
                      it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "WiFi: %s", id(wifi_ssid).state.c_str());
                   else
                      it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "WiFi: Scanning...");
               }
-              else if (current_item == 5) { // IP
+              else if (current_item == 6) { // IP
                   if (id(wifi_ip).has_state())
                      it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "IP: %s", id(wifi_ip).state.c_str());
                   else
                      it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "IP: N/A");
               }
-              else if (current_item == 6) { // Exit
+              else if (current_item == 7) { // Exit
                   it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "Exit");
               }
          }
@@ -609,6 +702,15 @@ script:
           event: esphome.remote_action
           data:
             action: click
+
+  - id: send_toggle_guest_event
+    mode: restart
+    then:
+      - script.execute: idle_timer
+      - homeassistant.event:
+          event: esphome.remote_action
+          data:
+            action: toggle_guest
 
   - id: send_back_event
     mode: restart
