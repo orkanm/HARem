@@ -1,7 +1,7 @@
 substitutions:
   name: "ha-remote"
   friendly_name: "HA Remote Controller"
-  fw_version: "v0.2"
+  fw_version: "v0.6.0-test"
 
 esphome:
   name: harem
