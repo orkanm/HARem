@@ -6,6 +6,7 @@ This file tracks planned improvements and premium features for the HARem Remote 
 - [ ] **"About" Screen**: Add a settings item to display firmware version, system uptime, and WiFi signal strength.
 - [ ] **Low Battery Overlay**: Trigger a centered "BATTERY LOW" warning overlay when the percentage drops below 10%.
 - [ ] **Visual OTA Progress**: Display a real-time progress bar on the remote screen during wireless firmware updates.
+- [ ] **Restrict PIN Change**: Ensure PIN can only be changed when Guest Mode is OFF (Full Access Mode).
 
 ## ✨ Visual & UX Refinements
 - [ ] **Animated Font Transitions**: Investigate cross-fading or sliding door transitions between menu screens.
