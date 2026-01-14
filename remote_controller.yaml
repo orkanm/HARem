@@ -31,6 +31,24 @@ api:
 
 ota:
   - platform: esphome
+    on_begin:
+      then:
+        - script.stop: idle_timer
+        - lambda: |-
+            id(ota_active) = true;
+            id(is_awake) = true;
+            id(my_display).turn_on();
+    on_progress:
+      then:
+        - lambda: |-
+            id(ota_progress) = x;
+            id(my_display).update();
+    on_end:
+      then:
+        - lambda: |-
+            id(ota_progress) = 100;
+            id(my_display).update();
+        - delay: 1s
     password: !secret harem_ota_password
 
 wifi:
@@ -169,6 +187,12 @@ globals:
   - id: pin_error_state
     type: bool
     initial_value: 'false'
+  - id: ota_active
+    type: bool
+    initial_value: 'false'
+  - id: ota_progress
+    type: int
+    initial_value: '0'
 
 # Import Home Assistant Entities
 binary_sensor:
@@ -459,6 +483,23 @@ display:
     update_interval: 0.1s
     lambda: |-
       // Draw Interface
+      
+      // 00A. CHECK FOR OTA UPDATE
+      if (id(ota_active)) {
+         it.fill(id(my_color_black));
+         if (id(ota_progress) >= 100) {
+            it.print(64, 25, id(font_header), TextAlign::CENTER, "REBOOTING...");
+         } else {
+            it.print(64, 20, id(font_header), TextAlign::CENTER, "UPDATING...");
+            it.printf(64, 35, id(font_medium), TextAlign::CENTER, "%d%%", id(ota_progress));
+            
+            // Progress Bar
+            int bar_w = 100;
+            it.rectangle((128-bar_w)/2, 55, bar_w, 4, id(my_color_white));
+            it.filled_rectangle((128-bar_w)/2, 55, (int)(bar_w * id(ota_progress) / 100.0), 4, id(my_color_white));
+         }
+         return;
+      }
       
       // 00B. CHECK FOR SLEEP COUNTDOWN
       if (id(sleep_countdown) > 0) {
