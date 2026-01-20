@@ -11,10 +11,16 @@ This file tracks planned improvements and premium features for the HARem Remote 
 ## ✨ Visual & UX Refinements
 - [ ] **Animated Font Transitions**: Investigate cross-fading or sliding door transitions between menu screens.
 - [ ] **Dynamic Marquee Speed**: Auto-adjust scrolling speed based on the length of the device name.
+- [ ] **Lock Navigation on Warning**: Prevent encoder from scrolling the device list while the "Not Supported !" warning is active.
 
 ## 🛠️ Hardware Integration (Future)
 - [ ] **Auto-Brightness**: Support for external light sensors to dim the display in dark environments.
 - [ ] **Advanced Power Metrics**: Track deeper battery health and discharge curves.
+
+## 🔋 Power & Hardware Optimization (SuperMini)
+- [ ] **Battery Calibration**: Recalibrate `GPIO0` ADC. Current reading `1.48V` on SuperMini implies a different internal divider than the DevKit (likely needs multiplier verification).
+- [ ] **Antenna Logic**: Monitor WiFi stability. The "SuperMini" has a weaker ceramic antenna; if connection drops recur, investigate external antenna mod or `wifi_power_save: LIGHT` tuning.
+- [ ] **Extreme Sleep**: Investigate if the SuperMini's onboard LDO/LED can be desoldered to drop deep sleep current from **0.9mA** to **<50µA**.
 
 ---
 *Maintained by Antigravity (ESPHome Integration Assistant)*
