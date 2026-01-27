@@ -603,6 +603,7 @@ sensor:
     unit_of_measurement: "V"
     accuracy_decimals: 2
     filters:
+      # Hardware: Voltage Divider (2x 1MΩ + 0.1µF Cap) -> Multiplier 2.0
       - multiply: 2.0 
     on_value:
       then:

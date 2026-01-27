@@ -6,7 +6,7 @@ This document outlines the hardware connections for the HARem Remote Controller 
 
 | GPIO Pin | Function | Mode | Notes |
 | :--- | :--- | :--- | :--- |
-| **GPIO 0** | Battery Voltage Monitor | ADC | Through voltage divider (Internal multiplier x2 in config) |
+| **GPIO 0** | Battery Voltage Monitor | ADC | Through voltage divider (Ultra Low Power: 2x 1MΩ + 0.1µF) |
 | **GPIO 4** | Encoder Button | INPUT_PULLUP | Inverted, Used as Deep Sleep Wakeup Source |
 | **GPIO 5** | I2C SDA | I2C Data | Connect to OLED SDA |
 | **GPIO 6** | I2C SCL | I2C Clock | Connect to OLED SCL |
@@ -54,8 +54,9 @@ graph LR
 
         subgraph Battery_Mon [Battery Monitor]
             BAT[Battery +]
-            R1[100k]
-            R2[100k]
+            R1[1M]
+            R2[1M]
+            C1[0.1uF]
         end
     end
 
@@ -75,5 +76,9 @@ graph LR
     R1 --- GPIO0
     GPIO0 --- R2
     R2 --- GND
+    
+    %% Capacitor for stability
+    GPIO0 --- C1
+    C1 --- GND
 ```
 
