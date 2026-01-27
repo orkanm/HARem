@@ -18,7 +18,10 @@ This file tracks planned improvements and premium features for the HARem Remote 
 - [ ] **Advanced Power Metrics**: Track deeper battery health and discharge curves.
 
 ## 🔋 Power & Hardware Optimization (SuperMini)
-- [ ] **Battery Calibration**: Recalibrate `GPIO0` ADC. Current reading `1.48V` on SuperMini implies a different internal divider than the DevKit (likely needs multiplier verification).
+- [ ] **Battery Calibration**: Recalibrate `GPIO0` ADC. Current reading `1.48V` is wrong.
+    - **Action**: Add Voltage Divider to SuperMini (Battery -> R1 -> GPIO0 -> R2 -> GND).
+    - **Values**: Use **2x 100kΩ** (Standard) or **2x 1MΩ + 0.1µF Cap** (Ultra Low Power).
+    - **Code**: `multiply: 2.0` (for equal resistors).
 - [ ] **Antenna Logic**: Monitor WiFi stability. The "SuperMini" has a weaker ceramic antenna; if connection drops recur, investigate external antenna mod or `wifi_power_save: LIGHT` tuning.
 - [ ] **Extreme Sleep**: Investigate if the SuperMini's onboard LDO/LED can be desoldered to drop deep sleep current from **0.9mA** to **<50µA**.
 
