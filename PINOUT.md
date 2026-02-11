@@ -7,18 +7,27 @@ This document outlines the hardware connections for the HARem Remote Controller 
 | GPIO Pin | Function | Mode | Notes |
 | :--- | :--- | :--- | :--- |
 | **GPIO 0** | Battery Voltage Monitor | ADC | Through voltage divider (Ultra Low Power: 2x 1MΩ + 0.1µF) |
+| **GPIO 1** | OLED Power Supply | OUTPUT | Powers the display. Held LOW in deep sleep. |
 | **GPIO 4** | Encoder Button | INPUT_PULLUP | Inverted, Used as Deep Sleep Wakeup Source |
 | **GPIO 5** | I2C SDA | I2C Data | Connect to OLED SDA |
 | **GPIO 6** | I2C SCL | I2C Clock | Connect to OLED SCL |
-| **GPIO 7** | OLED Power Supply | OUTPUT | Powers the display. Held LOW in deep sleep. |
-| **GPIO 8** | Encoder Pin A | INPUT_PULLUP | Rotary Encoder Clock/Data |
-| **GPIO 9** | Encoder Pin B | INPUT_PULLUP | Rotary Encoder Clock/Data |
+| **GPIO 7** | Free | - | - |
+| **GPIO 8** | Encoder Pin B | INPUT_PULLUP | Rotary Encoder Clock/Data |
+| **GPIO 9** | Encoder Pin A | INPUT_PULLUP | Rotary Encoder Clock/Data |
 
 ## Power Connections
 
 - **3.3V**: Main power rail for Peripherals (Encoder, etc.)
 - **GND**: Common Ground
 - **5V / VBUS**: Charging Input (SuperMini handles charging)
+
+## Power Consumption (Voltage Divider)
+With the **Ultra Low Power** design (2x 1MΩ):
+- **Resistance**: 2,000,000 Ω (2 MΩ)
+- **Max Current (at 4.2V)**: `4.2V / 2MΩ = 2.1 µA`
+- **Previous Design (2x 100k)**: `21 µA`
+- **Savings**: ~90% reduction in divider leakage.
+
 
 ## Connection Diagram
 
@@ -29,9 +38,9 @@ graph LR
         GPIO4[GPIO 4<br>Wakeup]
         GPIO5[GPIO 5<br>SDA]
         GPIO6[GPIO 6<br>SCL]
-        GPIO7[GPIO 7<br>Power]
-        GPIO8[GPIO 8<br>Enc A]
-        GPIO9[GPIO 9<br>Enc B]
+        GPIO1[GPIO 1<br>Power]
+        GPIO8[GPIO 8<br>Enc B]
+        GPIO9[GPIO 9<br>Enc A]
         V33[3.3V]
         GND[GND]
     end
@@ -61,14 +70,14 @@ graph LR
     end
 
     %% Wiring
-    GPIO7 -->|Power| O_VCC
+    GPIO1 -->|Power| O_VCC
     GPIO5 --- O_SDA
     GPIO6 --- O_SCL
     GND --- O_GND
 
     GPIO4 --- E_SW
-    GPIO8 --- E_DT
-    GPIO9 --- E_CLK
+    GPIO8 --- E_CLK
+    GPIO9 --- E_DT
     V33 --- E_VCC
     GND --- E_GND
 
