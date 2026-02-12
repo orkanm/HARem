@@ -67,6 +67,7 @@ The HARem PCB is designed to be compact and easy to assemble, housing the ESP32-
 
 #### Design Files
 *   **[KiCad Project](PCB/HArem/)**: Source files for schematic and board layout.
+*   **[Interactive 3D Viewer](https://3dviewer.net/index.html#model=https://raw.githubusercontent.com/orkanm/HARem/main/PCB/HArem/HArem.step)**: View the design directly in your browser.
 *   **[3D Model (STEP)](PCB/HArem/HArem.step)**: Industrial standard 3D file for enclosure design.
 *   **[3D Model (GLB)](PCB/HArem/HArem.glb)**: Web-friendly 3D model for visualizations.
 
