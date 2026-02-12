@@ -840,36 +840,7 @@ display:
          return;
       }
       
-      // 00B. CHECK FOR SLEEP COUNTDOWN
-      if (id(sleep_countdown) > 0) {
-        it.fill(id(my_color_black));
-        
-        // Breathing effect for "SLEEPING"
-        float pulse = 0;
-        if (id(enable_animations_v2) == 1) pulse = sin(millis() * 0.005) * 5.0; 
-        it.print(64, 4 + pulse, id(font_header), TextAlign::TOP_CENTER, "SLEEPING");
-        
-        it.printf(64, 34, id(font_count), TextAlign::CENTER, "%d", id(sleep_countdown));
-        
-        // Smooth Progress Bar
-        int bar_w = 80;
-        int bar_h = 4;
-        int bar_x = (128 - bar_w) / 2;
-        int bar_y = 54;
-        
-        uint32_t elapsed = millis() - id(sleep_start_ms);
-        float progress = 1.0f - (elapsed / 5000.0f);
-        if (progress < 0) progress = 0;
-        
-        it.rectangle(bar_x, bar_y, bar_w, bar_h, id(my_color_white));
-        if (id(enable_animations_v2) == 1) {
-            it.filled_rectangle(bar_x, bar_y, (int)(bar_w * progress), bar_h, id(my_color_white));
-        } else {
-            it.filled_rectangle(bar_x, bar_y, (int)(bar_w * (id(sleep_countdown)/5.0f)), bar_h, id(my_color_white));
-        }
-        
-        return;
-      }
+
 
       // 00. CHECK FOR HOTSPOT MODE (WiFi Failure)
       if (id(wifi_component).is_ap_active()) {
@@ -1194,16 +1165,15 @@ script:
       - delay: !lambda |-
           // Wait for sleep timeout before deep sleep logic
           return id(sleep_timeout_v2) * 1000;
-      - lambda: 'id(sleep_countdown) = 5; id(sleep_start_ms) = millis(); id(my_display).turn_on(); id(my_display).update();'
-      - delay: 1s
-      - lambda: 'id(sleep_countdown) = 4; id(my_display).update();'
-      - delay: 1s
-      - lambda: 'id(sleep_countdown) = 3; id(my_display).update();'
-      - delay: 1s
-      - lambda: 'id(sleep_countdown) = 2; id(my_display).update();'
-      - delay: 1s
-      - lambda: 'id(sleep_countdown) = 1; id(my_display).update();'
-      - delay: 1s
+      - lambda: 'id(is_awake) = true; id(my_display).turn_on(); id(my_display).update();'
+      - delay: 100ms
+      - repeat:
+          count: 3
+          then:
+            - lambda: 'id(my_display).turn_off();'
+            - delay: 300ms
+            - lambda: 'id(my_display).turn_on();'
+            - delay: 300ms
       - lambda: |-
           id(sleep_countdown) = -1;
           id(my_display).turn_off();
