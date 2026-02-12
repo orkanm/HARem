@@ -26,4 +26,4 @@ This file tracks planned improvements and premium features for the HARem Remote 
 - [ ] **Extreme Sleep**: Investigate if the SuperMini's onboard LDO/LED can be desoldered to drop deep sleep current from **0.9mA** to **<50µA**.
 
 ---
-*Maintained by Antigravity (ESPHome Integration Assistant)*
+*Maintained by Orkan Murat Celik*

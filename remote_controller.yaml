@@ -1,3 +1,6 @@
+# HARem - Home Assistant Remote Controller
+# Maintained by Orkan Murat Celik
+
 substitutions:
   name: "ha-remote"
   friendly_name: "HA Remote Controller"
