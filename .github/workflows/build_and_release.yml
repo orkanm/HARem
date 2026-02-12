@@ -21,7 +21,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install ESPHome
-        run: pip install esphome
+        run: pip install esphome==2025.12.2
 
       - name: Create Dummy Secrets
         run: |
@@ -42,7 +42,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: firmware-v${{ github.run_number }}
-          path: .esphome/build/harem/.pioenvs/harem/firmware.bin
+          path: .esphome/build/harem/.pioenvs/harem/firmware.factory.bin
 
   release:
     name: Create Release
@@ -62,7 +62,7 @@ jobs:
           path: output/
 
       - name: Rename Firmware
-        run: mv output/firmware.bin output/harem-firmware-${{ github.ref_name }}.bin
+        run: mv output/firmware.factory.bin output/harem-firmware-${{ github.ref_name }}.factory.bin
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
