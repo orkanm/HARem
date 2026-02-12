@@ -6,14 +6,15 @@ substitutions:
   friendly_name: "HA Remote Controller"
   fw_version: "v0.6.1-test"
 
+dashboard_import:
+  package_import_url: github://orkanm/HARem/remote_controller.yaml
+
 esphome:
   name: harem
   friendly_name: HARem
   project:
     name: "orkanm.harem"
     version: "0.6.1"
-  dashboard_import:
-    package_url: github://orkanm/HARem/remote_controller.yaml
   on_boot:
     - priority: 800
       then:
