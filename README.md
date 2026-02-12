@@ -23,7 +23,7 @@ Unlike traditional smart remotes that require manual configuration of every butt
 - **Infinite Extensibility**: Complex logic is handled by Home Assistant Blueprints and Automations, keeping the hardware lightweight and responsive.
 
 ## ✨ Premium Features
-- **Modern UI**: A 5-line OLED interface featuring **Outfit** and **Montserrat** typography for a professional, high-end feel.
+- **Modern UI**: A 5-line **1.3" OLED** interface featuring **Outfit** and **Montserrat** typography for a professional, high-end feel.
 - **Dynamic Marquee**: Long device names automatically scroll with a smooth marquee effect.
 - **Guest Mode Protection**: Secure, PIN-protected "Guest Mode" to restrict access to specific areas or devices.
 - **Visual Feedback**: Interactive animations for startup, sleep countdowns, and action confirmations.
@@ -47,9 +47,9 @@ Unlike traditional smart remotes that require manual configuration of every butt
     │    GPIO4 (SW)[Wake]◀──┼────────[SW]   (EC11)   │
     │                GND ◀──┼────────[GND]           │
     │                       │        └───────────────┘
-    │   GPIO0 (ADC) [BAT]◀──┼──┬─────[+] BATTERY     │
-    │                       │ [1M]   └───────────────┘
-    └───────────────────────┘  └──▶ 1M Divider to GND
+    │   GPIO0 (ADC) [BAT] ◀─┬──[1M]──[+] BAT / +5V  │
+    │                      [1M]                     │
+    └───────────────────────┴────────▶ GND          │
 ```
 
 ### Pin Mapping Table
@@ -58,10 +58,20 @@ Unlike traditional smart remotes that require manual configuration of every butt
 | **OLED SDA/SCL** | GPIO5 / GPIO6 | I2C | SSD1306/SH1106 |
 | **Encoder CLK/DT** | GPIO8 / GPIO9 | Input | Navigation |
 | **Encoder SW** | GPIO4 | Input | Wakeup Trigger |
-| **Battery ADC** | GPIO0 | Analog | 10k/10k Divider |
+| **Battery ADC** | GPIO0 | Analog | 1M/1M Divider |
+
+### 🛠️ PCB Design
+The HARem PCB is designed to be compact and easy to assemble, housing the ESP32-C3, OLED, and Rotary Encoder in a single unit.
+
+![HARem PCB Render](PCB/HArem/HArem_PCB.png)
+
+#### Design Files
+*   **[KiCad Project](PCB/HArem/)**: Source files for schematic and board layout.
+*   **[3D Model (STEP)](PCB/HArem/HArem.step)**: Industrial standard 3D file for enclosure design.
+*   **[3D Model (GLB)](PCB/HArem/HArem.glb)**: Web-friendly 3D model for visualizations.
 
 ## 🚀 Quick Start
-1.  **Hardware**: ESP32-C3 + SH1106 OLED + Rotary Encoder.
+1.  **Hardware**: ESP32-C3 + 1.3" SH1106 OLED + Rotary Encoder.
 2.  **Firmware**: Flash `remote_controller.yaml`.
 3.  **Home Assistant**: Follow the [Setup Guide](docs/generic_menu_setup.md) to create Helpers and Automation.
 

@@ -12,3 +12,10 @@ esphome_venv/
 # OS specific
 .DS_Store
 Thumbs.db
+
+# PCB Library Exclusions
+PCB/OLED_128X64_1.3_I2C/
+PCB/Rotary_Encoder.pretty/
+PCB/S2B-PH-K-S_LF__SN_/
+PCB/TP4056/
+PCB/EC11\ Rotary\ Encoder\ Dode\ Switch-15mm\ .STEP

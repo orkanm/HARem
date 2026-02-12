@@ -34,7 +34,7 @@ With the **Ultra Low Power** design (2x 1MΩ):
 ```mermaid
 graph LR
     subgraph ESP32_C3_SuperMini [ESP32-C3 SuperMini]
-        GPIO0[GPIO 0<br>ADC]
+        GPIO0[GPIO 0<br>ADC0]
         GPIO4[GPIO 4<br>Wakeup]
         GPIO5[GPIO 5<br>SDA]
         GPIO6[GPIO 6<br>SCL]
@@ -46,7 +46,7 @@ graph LR
     end
 
     subgraph Peripherals
-        subgraph OLED [OLED Display]
+        subgraph OLED [1.3" OLED Display]
             O_VCC[VCC]
             O_GND[GND]
             O_SDA[SDA]
@@ -57,15 +57,19 @@ graph LR
             E_SW[SW]
             E_DT[DT]
             E_CLK[CLK]
-            E_VCC[+]
-            E_GND[GND]
+            E_COM[COM]
+            R1[10k Pullup]
+            R2[100 Ohm]
+            R3[100 Ohm]
+            R4[100 Ohm]
+            C1[100nF]
         end
 
         subgraph Battery_Mon [Battery Monitor]
-            BAT[Battery +]
-            R1[1M]
-            R2[1M]
-            C1[0.1uF]
+            BAT[+5VD / BAT]
+            R5[1M]
+            R6[1M]
+            C2[0.1uF]
         end
     end
 
@@ -75,19 +79,27 @@ graph LR
     GPIO6 --- O_SCL
     GND --- O_GND
 
-    GPIO4 --- E_SW
-    GPIO8 --- E_CLK
-    GPIO9 --- E_DT
-    V33 --- E_VCC
+    GPIO4 --- R2
+    R2 --- E_SW
+    E_SW --- R1
+    R1 --- V33
+    E_SW --- C1
+    C1 --- GND
+
+    GPIO8 --- R3
+    R3 --- E_CLK
+    GPIO9 --- R4
+    R4 --- E_DT
+    E_COM --- GND
     GND --- E_GND
 
-    BAT --- R1
-    R1 --- GPIO0
-    GPIO0 --- R2
-    R2 --- GND
+    BAT --- R5
+    R5 --- GPIO0
+    GPIO0 --- R6
+    R6 --- GND
     
     %% Capacitor for stability
-    GPIO0 --- C1
-    C1 --- GND
+    GPIO0 --- C2
+    C2 --- GND
 ```
 

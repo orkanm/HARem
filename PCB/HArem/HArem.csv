@@ -1,0 +1,12 @@
+"Id";"Designator";"Footprint";"Quantity";"Designation";"Supplier and ref";
+1;"C2";"C_0805_2012Metric";1;"0.1uF";;;
+2;"R3,R4,R2";"R_0805_2012Metric";3;"100";;;
+3;"R6,R5";"R_0805_2012Metric";2;"1M";;;
+4;"C1";"C_0805_2012Metric";1;"100nF";;;
+5;"U1";"MODULE_ESP32-C3_SUPERMINI_TH";1;"ESP32-C3_SUPERMINI_TH";;;
+6;"SW1";"RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm_MountingHoles";1;"RotaryEncoder_Switch";;;
+7;"DS1";"LCD_OLED_128X64_1.3_I2C";1;"OLED_128X64_1.3_I2C";;;
+8;"Q1";"SOT-23";1;"BC817";;;
+9;"R1";"R_0805_2012Metric";1;"10K";;;
+10;"U2";"TP4056-Module";1;"~";;;
+11;"J1";"JST_S2B-PH-K-S_LF__SN_";1;"S2B-PH-K-S_LF__SN_";;;
