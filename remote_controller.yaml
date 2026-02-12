@@ -20,10 +20,21 @@ esphome:
             id(pin_change_stage) = 0;
             id(input_pin) = 0;
         - delay: 100ms # Give OLED time to power up
-    - priority: 600
+    - priority: 500
       then:
         - script.execute: idle_timer
         - lambda: 'id(my_display).set_contrast(id(screen_brightness) / 100.0);'
+    - priority: 400  # After idle_timer starts
+      then:
+        - lambda: |-
+            if (id(battery_percent) < 90.0) {
+              id(show_low_battery_warning) = true;
+              id(my_display).update();
+            }
+        - delay: 3s  # Show warning for 3 seconds
+        - lambda: |-
+            id(show_low_battery_warning) = false;
+
 
 esp32:
   board: esp32-c3-devkitm-1
@@ -230,6 +241,13 @@ globals:
   - id: temp_new_pin
     type: int
     initial_value: '0'
+  - id: left_hand_mode
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
+  - id: show_low_battery_warning
+    type: bool
+    initial_value: 'false'
 
 # Import Home Assistant Entities
 binary_sensor:
@@ -347,15 +365,18 @@ binary_sensor:
                   return;
                }
 
-               if (id(settings_index) == 8) { // Exit (Restored to Index 8)
+               if (id(settings_index) == 9) { // Exit (shifted to 9)
                  id(settings_mode) = false;
                  id(edit_mode) = false;
                  id(my_display).update();
-               } else if (id(settings_index) == 5) { // Change PIN
+               } else if (id(settings_index) == 6) { // Change PIN (shifted to 6)
                   id(guest_pin_mode) = true;
                   id(pin_change_stage) = 1; // Start Verify Flow
                   id(input_pin) = 0;
                   id(pin_error_state) = false;
+                  id(my_display).update();
+               } else if (id(settings_index) == 5) { // Left Hand Mode toggle
+                  id(left_hand_mode) = !id(left_hand_mode);
                   id(my_display).update();
                } else if (id(settings_index) == 4) { // Guest Mode toggle
                  if (id(guest_mode_state).state) {
@@ -507,9 +528,9 @@ sensor:
                  else:
                    # Move Down (Wrapped)
                    - lambda: |-
-                       // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:Guest, 5:ChangePIN, 6:SSID, 7:IP, 8:Exit
+                       // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:Guest, 5:LeftHand, 6:ChangePIN, 7:SSID, 8:IP, 9:Exit
                        id(settings_index)++;
-                       if (id(settings_index) > 8) id(settings_index) = 0;
+                       if (id(settings_index) > 9) id(settings_index) = 0;
                        id(my_display).update();
           else:
             - if:
@@ -591,9 +612,9 @@ sensor:
                  else:
                    # Move Up (Wrapped)
                    - lambda: |-
-                       // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:Guest, 5:ChangePIN, 6:SSID, 7:IP, 8:Exit
+                       // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:Guest, 5:LeftHand, 6:ChangePIN, 7:SSID, 8:IP, 9:Exit
                        if (id(settings_index) == 0) {
-                           id(settings_index) = 8; // 9 items (0-8)
+                           id(settings_index) = 9;
                        } else {
                            id(settings_index)--;
                        }
@@ -630,7 +651,16 @@ sensor:
             id(battery_percent) = (x - 3.2) / (4.2 - 3.2) * 100.0;
             if (id(battery_percent) > 100) id(battery_percent) = 100;
             if (id(battery_percent) < 0) id(battery_percent) = 0;
+            
+            // Check for low battery and show warning if device is awake
+            if (id(battery_percent) < 20.0 && id(is_awake)) {
+              ESP_LOGD("battery", "Low battery detected (%.1f%%), showing warning", id(battery_percent));
+              id(show_low_battery_warning) = true;
+              id(my_display).update();
+            }
+            
             id(my_display).update();
+        - script.execute: clear_battery_warning
 
 deep_sleep:
   id: sleep_module
@@ -649,7 +679,23 @@ display:
     i2c_id: bus_a
     update_interval: 0.1s
     lambda: |-
+      // Apply rotation for Left Hand Mode
+      if (id(left_hand_mode)) {
+        it.set_rotation(display::DISPLAY_ROTATION_180_DEGREES);
+      } else {
+        it.set_rotation(display::DISPLAY_ROTATION_0_DEGREES);
+      }
+
       // Draw Interface
+      
+      // 00. LOW BATTERY WARNING (highest priority)
+      if (id(show_low_battery_warning) && id(battery_percent) < 20.0) {
+        it.fill(COLOR_OFF);
+        it.print(64, 10, id(font_medium), TextAlign::TOP_CENTER, "LOW BATTERY!");
+        it.printf(64, 30, id(font_small), TextAlign::TOP_CENTER, "%.0f%%", id(battery_percent));
+        it.print(64, 50, id(font_small), TextAlign::TOP_CENTER, "Please charge");
+        return;
+      }
       
       // 00A. CHECK FOR OTA UPDATE
       if (id(ota_active)) {
@@ -764,7 +810,7 @@ display:
          int y_base = 20;
          
          for (int i = 0; i < 3; i++) {
-              int current_item = (id(settings_index) - 1 + i + 9) % 9;
+              int current_item = (id(settings_index) - 1 + i + 10) % 10;
               int y_pos = y_base + (i * 15);
               
               // Draw Caret
@@ -801,22 +847,25 @@ display:
               else if (current_item == 4) { // Guest Mode
                    it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Guest: %s", id(guest_mode_state).state ? "ON" : "OFF");
               }
-              else if (current_item == 5) { // Change PIN
+              else if (current_item == 5) { // Left Hand Mode
+                   it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Left Hand: %s", id(left_hand_mode) ? "ON" : "OFF");
+              }
+              else if (current_item == 6) { // Change PIN
                   it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "Change PIN >");
               }
-              else if (current_item == 6) { // WiFi
+              else if (current_item == 7) { // WiFi
                   if (id(wifi_ssid).has_state())
                      it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "WiFi: %s", id(wifi_ssid).state.c_str());
                   else
                      it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "WiFi: Scanning...");
               }
-              else if (current_item == 7) { // IP
+              else if (current_item == 8) { // IP
                   if (id(wifi_ip).has_state())
                      it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "IP: %s", id(wifi_ip).state.c_str());
                   else
                      it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "IP: N/A");
               }
-              else if (current_item == 8) { // Exit
+              else if (current_item == 9) { // Exit
                   it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "Exit");
               }
          }
@@ -925,6 +974,13 @@ display:
       if (id(remote_line_5).has_state()) it.printf(64, 52, id(font_small), TextAlign::TOP_CENTER, "%s", id(remote_line_5).state.c_str());
 
 script:
+  - id: clear_battery_warning
+    mode: restart
+    then:
+      - delay: 3s
+      - lambda: |-
+          id(show_low_battery_warning) = false;
+          id(my_display).update();
   - id: idle_timer
     mode: restart
     then:
