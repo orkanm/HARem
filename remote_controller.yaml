@@ -101,12 +101,6 @@ wifi:
     # Set a low power save mode to speed up the connection when waking up
   power_save_mode: LIGHT
   
-  ap:
-    ssid: "HARem-AP"
-    password: "" # Open AP for initial setup
-
-captive_portal:
-  
   # Callback when Wi-Fi disconnects
   on_disconnect:
     - logger.log: "Wi-Fi disconnected!"
