@@ -30,6 +30,12 @@ Unlike traditional smart remotes that require manual configuration of every butt
 - **Power Intelligence**: Configurable standby and deep-sleep modes with precise battery voltage monitoring.
 - **Global Control**: Toggle animations and power settings directly from a local on-device menu.
 
+### 🔋 Ultra-Low Power Design
+HARem is optimized for maximum battery performance:
+*   **Deep Sleep**: Leverages ESP32-C3 deep sleep for sub-1mA idle consumption.
+*   **Ultra-Low-Power Divider**: Uses a high-impedance **1MΩ/1MΩ** battery voltage divider to eliminate parasitic drain.
+*   **Active Management**: Components like the OLED are completely powered down when the device is dormant.
+
 ## 🛠️ Hardware Setup
 
 ### Wiring Diagram (ASCII)
