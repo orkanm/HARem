@@ -48,8 +48,8 @@ Unlike traditional smart remotes that require manual configuration of every butt
     │                GND ◀──┼────────[GND]           │
     │                       │        └───────────────┘
     │   GPIO0 (ADC) [BAT]◀──┼──┬─────[+] BATTERY     │
-    │                       │ [10k]  └───────────────┘
-    └───────────────────────┘  └──▶ 10k Divider to GND
+    │                       │ [1M]   └───────────────┘
+    └───────────────────────┘  └──▶ 1M Divider to GND
 ```
 
 ### Pin Mapping Table
@@ -81,4 +81,4 @@ esphome run remote_controller.yaml
 ## ☕ Support the Project
 If you find this project helpful and would like to support its development, you can buy me a coffee! Your support helps fund new prototypes and keeps the project open-source and free for everyone.
 
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Donate-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://www.buymeacoffee.com/orkanm)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Donate-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://www.buymeacoffee.com/orquitto)
