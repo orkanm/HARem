@@ -16,4 +16,5 @@ Thumbs.db
 # PCB Project Local Files
 PCB/HArem/fp-info-cache
 PCB/HArem/HArem-backups/
+PCB/ESP32-C3_SUPERMINI_TH/
 *.lck
