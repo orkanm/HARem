@@ -1,0 +1,14 @@
+# Handle language detection overrides
+# Mark YAML as the primary language
+*.yaml linguist-language=YAML
+*.yml linguist-language=YAML
+
+# Treat PCB files as documentation/assets to avoid skewing code stats
+PCB/** linguist-documentation
+docs/** linguist-documentation
+blueprints/** linguist-documentation
+
+# Ensure KiCad files are handled correctly
+*.kicad_pcb linguist-language=KiCad
+*.kicad_sch linguist-language=KiCad
+*.kicad_pro linguist-language=KiCad
