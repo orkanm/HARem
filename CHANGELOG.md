@@ -2,6 +2,22 @@
 
 All notable changes to the HARem project will be documented in this file.
 
+## [v0.6.2] - 2026-02-12
+
+### Added
+- **Interactive Visualizers**: Integrated KiCanvas for interactive Schematics and PCB Layouts.
+- **3D Design**: Added high-quality STEP model for industrial-grade enclosure design.
+- **WiFi Provisioning**: Enabled **Improv Serial** and **Captive Portal** for easy setup on new networks.
+- **Brand Identity**: Added ESPHome branding and corrected GitHub language detection.
+- **Dashboard Integration**: Added `dashboard_import` for seamless ESPHome integration.
+
+### Changed
+- **Power Optimization**: Documented ultra-low-power design and standardized 1M/1M battery divider specs.
+- **Repository Hygiene**: Optimized `.gitignore` and `.gitattributes` for a cleaner developer experience.
+- **Hardware Accuracy**: Aligned all diagrams and specifications with the final PCB design.
+
+---
+
 ## [v0.2] - 2026-01-03
 
 ### Added
