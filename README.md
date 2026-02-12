@@ -83,8 +83,16 @@ The HARem PCB is designed to be compact and easy to assemble, housing the ESP32-
 
 ## 🚀 Quick Start
 1.  **Hardware**: ESP32-C3 + 1.3" SH1106 OLED + Rotary Encoder.
-2.  **Firmware**: Flash `remote_controller.yaml`.
-3.  **Home Assistant**: Follow the [Setup Guide](docs/generic_menu_setup.md) to create Helpers and Automation.
+2.  **Firmware**: 
+    *   **Option A (Recommended)**: Download the latest **`.factory.bin`** from [Releases](https://github.com/orkanm/HARem/releases) and flash it to **offset 0x0**.
+    *   **Option B**: Compile locally using `esphome run remote_controller.yaml`.
+3.  **Home Assistant**: 
+    *   The device will appear as "HARem" in your dashboard.
+    *   **IMPORTANT**: If you used the GitHub Release binary, you will be asked for an **Encryption Key**:
+        > `7knRB3/EL4Fq8Foul7Yhv+pcABzyLXHSQxa9bTzzQqg=`
+    *   > [!WARNING]
+        > This key is **publicly known**. For security, you should change it in your own configuration and perform an [OTA update](https://esphome.io/components/ota.html) as soon as the device is connected to your Home Assistant.
+    *   Follow the [Setup Guide](docs/generic_menu_setup.md) to create Helpers and Automation.
 
 ## 📖 Extended Documentation
 *   **[Setup Guide](docs/generic_menu_setup.md)**: How to configure Home Assistant.
