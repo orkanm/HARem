@@ -816,6 +816,9 @@ display:
          
          it.print(64, 0, id(font_small), TextAlign::TOP_CENTER, "- SETTINGS -");
          
+         // Draw WiFi Signal in top left
+         it.printf(0, 0, id(font_small), TextAlign::TOP_LEFT, "%.0fdB", id(wifi_signal_sensor).state);
+         
          // Draw Battery % in top right
          it.printf(127, 0, id(font_small), TextAlign::TOP_RIGHT, "%.0f%%", id(battery_percent));
          
