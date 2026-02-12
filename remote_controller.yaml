@@ -5,6 +5,7 @@ substitutions:
   name: "ha-remote"
   friendly_name: "HA Remote Controller"
   fw_version: "v0.6.2"
+  log_level: "INFO" # DEBUG, INFO, WARNING, ERROR, NONE
 
 dashboard_import:
   package_import_url: github://orkanm/HARem/remote_controller.yaml
@@ -55,13 +56,14 @@ improv_serial:
 
 # Enable logging
 logger:
-  level: DEBUG
+  level: ${log_level}
 
 preferences:
   flash_write_interval: 10s
 
 # Enable Home Assistant API
 api:
+  id: api_server
   encryption:
     key: !secret harem_api_key
 
@@ -173,6 +175,9 @@ globals:
     type: bool
     restore_value: no
     initial_value: 'true'
+  - id: last_wifi_switch_ms
+    type: uint32_t
+    initial_value: '0'
   - id: standby_duration_v2
     type: int
     restore_value: yes
@@ -201,6 +206,18 @@ globals:
     type: bool
     initial_value: 'false'
   - id: processed_rotate_hold
+    type: bool
+    initial_value: 'false'
+  - id: pending_response
+    type: bool
+    initial_value: 'false'
+  - id: last_action_ms
+    type: uint32_t
+    initial_value: '0'
+  - id: offline_prompt_active
+    type: bool
+    initial_value: 'false'
+  - id: is_scanning
     type: bool
     initial_value: 'false'
   - id: control_mode
@@ -283,6 +300,12 @@ binary_sensor:
           id(press_time) = millis();
           id(processed_settings_hold) = false;
           id(processed_rotate_hold) = false;
+
+          // If offline prompt is active, ignore hold logic
+          if (id(offline_prompt_active)) return;
+          // Block inputs during scanning
+          if (id(is_scanning)) return;
+
       - script.execute: handle_settings_hold
     on_release:
       - script.stop: handle_settings_hold
@@ -297,6 +320,7 @@ binary_sensor:
           id(idle_timer)->execute();
 
           if (id(processed_settings_hold)) return;
+          if (id(is_scanning)) return;
           
           uint32_t duration = millis() - id(press_time);
           if (duration < 10) return; // Debounce
@@ -318,6 +342,15 @@ binary_sensor:
           
           if (duration < 800) {
             // SHORT CLICK
+
+            // OFFLINE PROMPT CLICK
+            if (id(offline_prompt_active)) {
+               id(offline_prompt_active) = false;
+               id(wifi_manual_reconnect)->execute();
+               id(my_display).update();
+               return;
+            }
+
             if (id(control_mode)) {
                 id(control_mode) = false;
                 id(last_control_exit) = millis();
@@ -381,6 +414,9 @@ binary_sensor:
                  id(settings_mode) = false;
                  id(edit_mode) = false;
                  id(my_display).update();
+               } else if (id(settings_index) == 7) { // WiFi Manual Scan (Item 7)
+                  id(wifi_manual_reconnect)->execute();
+                  id(my_display).update();
                } else if (id(settings_index) == 6) { // Change PIN (shifted to 6)
                   id(guest_pin_mode) = true;
                   id(pin_change_stage) = 1; // Start Verify Flow
@@ -407,6 +443,13 @@ binary_sensor:
                }
             } else {
                if (id(is_awake)) {
+                  // Only show prompt if we have previously loaded UI (line 3 has content)
+                  // AND it's been > 10s (double safety)
+                  if (millis() > 10000 && !id(api_server).is_connected() && id(remote_line_3).state.length() > 0) {
+                     id(offline_prompt_active) = true;
+                     id(my_display).update();
+                     return;
+                  }
                  id(send_click_event)->execute();
                } else {
                  id(idle_timer)->execute();
@@ -421,7 +464,8 @@ binary_sensor:
                } else {
                    ESP_LOGD("main", "Exiting Settings via 1s hold");
                    id(settings_mode) = false;
-                   id(edit_mode) = false;
+                  id(edit_mode) = false;
+                  id(pending_response) = false;
                }
             } else {
                id(send_back_event)->execute();
@@ -432,25 +476,46 @@ text_sensor:
   - platform: homeassistant
     id: remote_line_1
     entity_id: input_text.harem_line_1
+    on_value:
+      then:
+        - lambda: 'id(pending_response) = false;'
   - platform: homeassistant
     id: remote_line_2
     entity_id: input_text.harem_line_2
+    on_value:
+      then:
+        - lambda: 'id(pending_response) = false;'
   - platform: homeassistant
     id: remote_line_3
     entity_id: input_text.harem_line_3
+    on_value:
+      then:
+        - lambda: 'id(pending_response) = false;'
   - platform: homeassistant
     id: remote_line_3_status
     entity_id: input_text.harem_line_3_status
+    on_value:
+      then:
+        - lambda: 'id(pending_response) = false;'
   - platform: homeassistant
     id: remote_line_4
     entity_id: input_text.harem_line_4
+    on_value:
+      then:
+        - lambda: 'id(pending_response) = false;'
   - platform: homeassistant
     id: remote_line_5
     entity_id: input_text.harem_line_5
+    on_value:
+      then:
+        - lambda: 'id(pending_response) = false;'
 
   - platform: homeassistant
     id: remote_overlay
     entity_id: input_text.harem_overlay
+    on_value:
+      then:
+        - lambda: 'id(pending_response) = false;'
 
   - platform: wifi_info
     ip_address:
@@ -473,6 +538,10 @@ sensor:
     on_clockwise:
       - script.execute: idle_timer
       - lambda: |-
+          if (id(is_scanning)) return;
+          // Block rotation if UI is not ready (Boot/Connecting screens)
+          if (id(remote_line_3).state.length() == 0) return;
+
           if (id(encoder_button).state) {
             // Check if status contains '*' (dimmable)
             std::string st = id(remote_line_3_status).state;
@@ -549,14 +618,36 @@ sensor:
                 condition:
                   lambda: 'return !id(control_mode) && !id(processed_rotate_hold);'
                 then:
-                  - homeassistant.event:
-                      event: esphome.remote_action
-                      data:
-                        action: next
+                   - if:
+                       condition:
+                          lambda: "return millis() > 10000 && !id(api_server).is_connected() && id(remote_line_3).state.length() > 0;"
+                       then:
+                         - lambda: |-
+                             id(offline_prompt_active) = true;
+                             id(my_display).update();
+                       else:
+                         - homeassistant.event:
+                             event: esphome.remote_action
+                             data:
+                               action: next
+                         - lambda: |-
+                             id(pending_response) = true;
+                             id(last_action_ms) = millis();
 
     on_anticlockwise:
       - script.execute: idle_timer
       - lambda: |-
+          if (id(is_scanning)) return;
+          // Block rotation if UI is not ready (Boot/Connecting screens)
+          if (id(remote_line_3).state.length() == 0) return;
+
+          // Dismiss offline prompt on rotation
+          if (id(offline_prompt_active)) {
+              id(offline_prompt_active) = false;
+              id(my_display).update();
+              return;
+          }
+
           if (id(encoder_button).state) {
             // Check if status contains '*' (dimmable)
             std::string st = id(remote_line_3_status).state;
@@ -636,10 +727,21 @@ sensor:
                 condition:
                   lambda: 'return !id(control_mode) && !id(processed_rotate_hold);'
                 then:
-                  - homeassistant.event:
-                      event: esphome.remote_action
-                      data:
-                        action: prev
+                   - if:
+                       condition:
+                          lambda: "return millis() > 10000 && !id(api_server).is_connected() && id(remote_line_3).state.length() > 0;"
+                       then:
+                         - lambda: |-
+                             id(offline_prompt_active) = true;
+                             id(my_display).update();
+                       else:
+                         - homeassistant.event:
+                             event: esphome.remote_action
+                             data:
+                               action: prev
+                         - lambda: |-
+                             id(pending_response) = true;
+                             id(last_action_ms) = millis();
 
   - platform: wifi_signal
     name: "WiFi Signal"
@@ -708,7 +810,19 @@ display:
         it.print(64, 50, id(font_small), TextAlign::TOP_CENTER, "Please charge");
         return;
       }
+
+      // 00S. CHECK FOR SCANNING MODE - REMOVED (Use Connecting Screen instead)
+      // if (id(is_scanning)) { ... }
       
+      // 00Y. CHECK OFFLINE PROMPT
+      if (id(offline_prompt_active)) {
+         it.fill(id(my_color_black));
+         it.print(64, 15, id(font_header), TextAlign::TOP_CENTER, "CONNECTION LOST");
+         it.print(64, 35, id(font_small), TextAlign::TOP_CENTER, "Click to Scan WiFi");
+         it.print(64, 50, id(font_small), TextAlign::TOP_CENTER, "Rotate to Dismiss");
+         return;
+      }
+
       // 00A. CHECK FOR OTA UPDATE
       if (id(ota_active)) {
          it.fill(id(my_color_black));
@@ -869,7 +983,7 @@ display:
                   it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "Change PIN >");
               }
               else if (current_item == 7) { // WiFi
-                  if (id(wifi_ssid).has_state())
+                  if (id(wifi_ssid).has_state() && id(wifi_ssid).state.length() > 0)
                      it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "WiFi: %s", id(wifi_ssid).state.c_str());
                   else
                      it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "WiFi: Scanning...");
@@ -963,6 +1077,7 @@ display:
           it.print(64, 0, id(font_header), TextAlign::TOP_CENTER, "HARem");
           it.print(64, 25, id(font_small), TextAlign::TOP_CENTER, "HomeAssistant Remote");
           it.print(64, 40, id(font_small), TextAlign::TOP_CENTER, "Controller");
+          it.print(64, 52, id(font_small), TextAlign::TOP_CENTER, "${fw_version}");
         } else {
           it.fill(id(my_color_black));
           float pulse = 0;
@@ -981,14 +1096,88 @@ display:
              it.rectangle(start_x, 40, container_w, 3, id(my_color_white));
              it.filled_rectangle(start_x + (container_w - bar_w)/2, 40, bar_w, 3, id(my_color_white));
           }
-          it.print(64, 50, id(font_small), TextAlign::TOP_CENTER, "${fw_version}");
         }
       }
 
       if (id(remote_line_4).has_state()) it.printf(64, 41, id(font_small), TextAlign::TOP_CENTER, "%s", id(remote_line_4).state.c_str());
       if (id(remote_line_5).has_state()) it.printf(64, 52, id(font_small), TextAlign::TOP_CENTER, "%s", id(remote_line_5).state.c_str());
 
+interval:
+  - interval: 60s
+    then:
+      - script.execute: wifi_roaming_check
+
+  - interval: 1s
+    then:
+      - lambda: |-
+          if (id(pending_response) && (millis() - id(last_action_ms) > 5000)) {
+              if (millis() - id(last_wifi_switch_ms) < 45000) {
+                 id(pending_response) = false;
+                 return;
+              }
+              ESP_LOGW("watchdog", "Response timeout! Warning only.");
+              id(pending_response) = false;
+              // id(offline_prompt_active) = true; // DISABLED
+              id(my_display).update();
+          }
+
 script:
+  - id: wifi_roaming_check
+    then:
+      - if:
+          condition:
+            lambda: |-
+              if (!id(is_awake)) return false;
+              // Only consider roaming if signal is weak
+              if (id(wifi_signal_sensor).state > -75.0) return false;
+              // Cooldown: 2 minutes (120000 ms)
+              if ((millis() - id(last_wifi_switch_ms)) < 120000) return false;
+              return true;
+          then:
+            - logger.log:
+                format: "WiFi signal weak (%.1f dB), rebooting WiFi to find better signal..."
+                args: [ 'id(wifi_signal_sensor).state' ]
+            - lambda: |-
+                id(last_wifi_switch_ms) = millis();
+            - wifi.disable:
+            - delay: 1s
+            - wifi.enable:
+
+  - id: wifi_manual_reconnect
+    then:
+      - logger.log: "Manual WiFi reconnect triggered by user."
+      - lambda: |-
+          id(last_wifi_switch_ms) = millis();
+          id(is_scanning) = true;
+          id(settings_mode) = false; // Exit settings menu
+          id(edit_mode) = false;
+          id(offline_prompt_active) = false; // Clear any existing offline prompt
+          id(local_overlay_msg) = "";      // Clear any local overlay
+          // Clear all remote lines to ensure clean "Connecting" screen
+          id(remote_line_1).publish_state("");
+          id(remote_line_2).publish_state("");
+          id(remote_line_3).publish_state("");
+          id(remote_line_4).publish_state("");
+          id(remote_line_5).publish_state("");
+          id(my_display).update();
+      - wifi.disable:
+      - delay: 1s
+      - wifi.enable:
+      - wait_until:
+          condition:
+            wifi.connected:
+          timeout: 45s
+      - if:
+          condition:
+            wifi.connected:
+          then:
+             - logger.log: "WiFi Connected! Returning to Connecting screen..."
+             - lambda: 'id(is_scanning) = false; id(pending_response) = false; id(my_display).update();'
+          else:
+             - logger.log: "WiFi Scan Timed Out!"
+             - lambda: 'id(is_scanning) = false; id(pending_response) = false; id(my_display).update();'
+             # Fallback to AP is handled by wifi component settings or manual toggle if needed
+
   - id: clear_battery_warning
     mode: restart
     then:
