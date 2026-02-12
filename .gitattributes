@@ -1,7 +1,7 @@
 # Handle language detection overrides
-# Mark YAML as the primary language
-*.yaml linguist-language=YAML
-*.yml linguist-language=YAML
+# Attempt to force ESPHome as the language label
+*.yaml linguist-language=ESPHome
+*.yml linguist-language=ESPHome
 
 # Treat PCB files as documentation/assets to avoid skewing code stats
 PCB/** linguist-documentation
