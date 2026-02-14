@@ -81,6 +81,12 @@ The HARem PCB is designed to be compact and easy to assemble, housing the ESP32-
 *   **[KiCad Project](PCB/HArem/)**: Source files for schematic and board layout.
 *   **[3D Model (STEP)](PCB/HArem/HArem.step)**: Industrial standard 3D file for enclosure design.
 
+### 🏠 Housing / 3D Case
+The project includes a custom-designed 3D printable case.
+*   **[Case Files](Case/)**: STLs and STEP files for the housing and cover.
+*   **[Case Assembly Guide](Case/README.md)**: Printing parameters and assembly instructions.
+
+
 ## 🚀 Quick Start
 1.  **Hardware**: ESP32-C3 + 1.3" SH1106 OLED + Rotary Encoder.
 2.  **Firmware**: 
