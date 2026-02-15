@@ -436,6 +436,9 @@ binary_sensor:
                  } else {
                     // IF OFF: Toggle freely
                     id(send_toggle_guest_event)->execute();
+                    id(settings_mode) = false;
+                    id(edit_mode) = false;
+                    id(my_display).update();
                  }
                } else if (id(settings_index) < 4) { // Editable items (0,1,2,3)
                  id(edit_mode) = !id(edit_mode);
