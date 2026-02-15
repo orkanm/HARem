@@ -5,12 +5,12 @@ This directory contains the 3D printable files for the HARem case. The design is
 ## Files
 
 - **STLs (Standard Tessellation Language)**: Ready-to-slice files for 3D printing.
-    - `HARem_Case_V1.0-Housing.stl`: The main body of the remote.
-    - `HARem_Case_V1.0-Cover.stl`: The front cover.
+    - `HARem_Case_V1.0-Body.stl`: The main body of the remote. [View in 3D](https://3dviewer.net/#model=https://raw.githubusercontent.com/orkanm/HARem/main/Case/HARem_Case_V1.0-Body.stl)
+    - `HARem_Case_V1.0-Cover.stl`: The front cover. [View in 3D](https://3dviewer.net/#model=https://raw.githubusercontent.com/orkanm/HARem/main/Case/HARem_Case_V1.0-Cover.stl)
 - **STEP (Standard for the Exchange of Product model data)**: Editable CAD files for modification.
-    - `HARem_Case_V1.0-Housing.step`
-    - `HARem_Case_V1.0-Cover.step`
-    - `HARem_Case_V1.0.step`: Full assembly.
+    - `Body.step` [View in 3D](https://3dviewer.net/#model=https://raw.githubusercontent.com/orkanm/HARem/main/Case/Body.step)
+    - `Cover.step` [View in 3D](https://3dviewer.net/#model=https://raw.githubusercontent.com/orkanm/HARem/main/Case/Cover.step)
+    - `Assembled_3d.step`: Full assembly. [View in 3D](https://3dviewer.net/#model=https://raw.githubusercontent.com/orkanm/HARem/main/Case/Assembled_3d.step)
 - **FreeCAD Project**: Source project file for FreeCAD.
     - `HARem_Case_V1.0.FCStd`
 
