@@ -16,12 +16,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Install ESPHome
-        run: pip install esphome==2025.12.2
+        run: pip install esphome==2026.2.0
 
       - name: Create Dummy Secrets
         run: |
@@ -65,7 +65,7 @@ jobs:
         run: mv output/firmware.factory.bin output/harem-firmware-${{ github.ref_name }}.factory.bin
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: output/*.bin
           generate_release_notes: true
