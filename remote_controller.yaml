@@ -762,13 +762,25 @@ sensor:
     filters:
       # Hardware: Voltage Divider (2x 1MΩ + 0.1µF Cap) -> Multiplier 2.0
       - multiply: 2.0 
+      # Smoothing to reduce noise
+      - sliding_window_moving_average:
+          window_size: 15
+          send_every: 15
     on_value:
       then:
         - lambda: |-
-            id(battery_percent) = (x - 3.2) / (4.2 - 3.2) * 100.0;
-            if (id(battery_percent) > 100) id(battery_percent) = 100;
-            if (id(battery_percent) < 0) id(battery_percent) = 0;
+            float new_percent = (x - 3.2) / (4.2 - 3.2) * 100.0;
+            if (new_percent > 100) new_percent = 100;
+            if (new_percent < 0) new_percent = 0;
             
+            // Only update if:
+            // 1. First run (id(battery_percent) is default 100 or something)
+            // 2. Battery is draining (new < old)
+            // 3. Charging detected (new > old + 5%)
+            if (new_percent < id(battery_percent) || new_percent > (id(battery_percent) + 5.0)) {
+               id(battery_percent) = new_percent;
+            }
+
             // Check for low battery and show warning if device is awake
             if (id(battery_percent) < 20.0 && id(is_awake)) {
               ESP_LOGD("battery", "Low battery detected (%.1f%%), showing warning", id(battery_percent));
@@ -805,7 +817,19 @@ display:
 
       // Draw Interface
       
-      // 00. LOW BATTERY WARNING (highest priority)
+       // 00X. SLEEP COUNTDOWN OVERLAY (Highest Priority)
+      // 00X. SLEEP COUNTDOWN OVERLAY (Highest Priority)
+      if (id(sleep_countdown) > 0) {
+         it.fill(id(my_color_black));
+         // If > 5, it's just a "Force Black" state (used before standby)
+         if (id(sleep_countdown) > 5) return;
+         
+         it.print(64, 10, id(font_medium), TextAlign::TOP_CENTER, "Sleep in");
+         it.printf(64, 30, id(font_count), TextAlign::TOP_CENTER, "%d", id(sleep_countdown));
+         return;
+      }
+      
+      // 00. LOW BATTERY WARNING
       if (id(show_low_battery_warning) && id(battery_percent) < 20.0) {
         it.fill(COLOR_OFF);
         it.print(64, 10, id(font_medium), TextAlign::TOP_CENTER, "LOW BATTERY!");
@@ -1164,19 +1188,36 @@ script:
     then:
       - lambda: 'id(my_display).turn_on(); id(is_awake) = true; id(sleep_countdown) = -1;'
       - delay: !lambda 'return id(standby_duration_v2) * 1000;'
-      - lambda: 'id(my_display).turn_off(); id(is_awake) = false;'
+      - lambda: |-
+
+          // Force Black Screen before turning off to ensure clean buffer on wake
+          ESP_LOGD("idle", "State: FORCE BLACK");
+          id(sleep_countdown) = 999; 
+          // Removed manual update() to avoid crash
+      - delay: 300ms # Wait 300ms for natural update to clear screen
+      - lambda: |-
+          ESP_LOGD("idle", "State: SCREEN OFF");
+          id(my_display).turn_off();
+          id(is_awake) = false;
       - delay: !lambda |-
           // Wait for sleep timeout before deep sleep logic
           return id(sleep_timeout_v2) * 1000;
-      - lambda: 'id(is_awake) = true; id(my_display).turn_on(); id(my_display).update();'
-      - delay: 100ms
+      - lambda: |-
+          ESP_LOGD("idle", "State: COUNTDOWN START");
+          id(sleep_countdown) = 5;
+          id(is_awake) = true;
+          // Removed manual update() and turn_on() here. 
+          // We will let the natural loop pick it up or do a safe staggered turn_on
+          
+          // Let's safe turn on:
+          id(my_display).turn_on(); 
+      - delay: 200ms # Wait for "5" to render
       - repeat:
-          count: 3
+          count: 5 # Loop 5 times (5,4,3,2,1)
           then:
-            - lambda: 'id(my_display).turn_off();'
-            - delay: 300ms
-            - lambda: 'id(my_display).turn_on();'
-            - delay: 300ms
+            - lambda: 'id(my_display).update();' # Force update for countdown digits is safer than rapid firing
+            - delay: 1s
+            - lambda: 'id(sleep_countdown) -= 1;'
       - lambda: |-
           id(sleep_countdown) = -1;
           id(my_display).turn_off();
