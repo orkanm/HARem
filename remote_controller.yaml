@@ -30,11 +30,11 @@ esphome:
             id(pin_change_stage) = 0;
             id(input_pin) = 0;
         - delay: 100ms # Give OLED time to power up
-    - priority: 500
+    - priority: 300
       then:
         - script.execute: idle_timer
         - lambda: 'id(my_display).set_contrast(id(screen_brightness) / 100.0);'
-    - priority: 400  # After idle_timer starts
+    - priority: 200  # After idle_timer starts
       then:
         - lambda: |-
             if (id(battery_percent) < 90.0) {
