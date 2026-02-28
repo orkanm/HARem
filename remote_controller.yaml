@@ -4,7 +4,7 @@
 substitutions:
   name: "ha-remote"
   friendly_name: "HA Remote Controller"
-  fw_version: "v0.6.2-Fix"
+  fw_version: "v0.6.2-SettingsMenu"
 
 dashboard_import:
   package_import_url: github://orkanm/HARem/remote_controller.yaml
@@ -65,6 +65,13 @@ preferences:
 api:
   encryption:
     key: !secret harem_api_key
+  on_client_connected:
+    then:
+      - lambda: |-
+          if (id(local_overlay_msg) == "Scanning WiFi...") {
+            id(local_overlay_msg) = "";
+            id(my_display).update();
+          }
 
 ota:
   - platform: esphome
@@ -90,7 +97,7 @@ ota:
 
 wifi:
   id: wifi_component
-  fast_connect: true
+  fast_connect: false
   networks:
     - ssid: !secret wifi_ssid
       password: !secret wifi_password
@@ -161,6 +168,9 @@ font:
   - file: "gfonts://Outfit"
     id: font_small
     size: 10
+  - file: "gfonts://Outfit"
+    id: font_tiny
+    size: 9
   - file: "gfonts://Bebas Neue"
     id: font_count
     size: 32
@@ -378,11 +388,15 @@ binary_sensor:
                   return;
                }
 
-               if (id(settings_index) == 9) { // Exit (shifted to 9)
+               if (id(settings_index) == 9) { // Exit
                  id(settings_mode) = false;
                  id(edit_mode) = false;
                  id(my_display).update();
-               } else if (id(settings_index) == 6) { // Change PIN (shifted to 6)
+               } else if (id(settings_index) == 7) { // WiFi (Rescan Trigger)
+                  id(settings_mode) = false;
+                  id(my_display).update();
+                  id(rescan_wifi)->execute();
+               } else if (id(settings_index) == 6) { // Change PIN
                   id(guest_pin_mode) = true;
                   id(pin_change_stage) = 1; // Start Verify Flow
                   id(input_pin) = 0;
@@ -541,7 +555,7 @@ sensor:
                  else:
                    # Move Down (Wrapped)
                    - lambda: |-
-                       // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:Guest, 5:LeftHand, 6:ChangePIN, 7:SSID, 8:IP, 9:Exit
+                       // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:Guest, 5:LeftHand, 6:ChangePIN, 7:WiFi, 8:IP, 9:Exit
                        id(settings_index)++;
                        if (id(settings_index) > 9) id(settings_index) = 0;
                        id(my_display).update();
@@ -625,7 +639,7 @@ sensor:
                  else:
                    # Move Up (Wrapped)
                    - lambda: |-
-                       // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:Guest, 5:LeftHand, 6:ChangePIN, 7:SSID, 8:IP, 9:Exit
+                       // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:Guest, 5:LeftHand, 6:ChangePIN, 7:WiFi, 8:IP, 9:Exit
                        if (id(settings_index) == 0) {
                            id(settings_index) = 9;
                        } else {
@@ -813,74 +827,86 @@ display:
       // 0A. CHECK SETTINGS MODE (Local)
       if (id(settings_mode)) {
          it.fill(id(my_color_black));
-         it.filled_rectangle(0, 0, 128, 64, id(my_color_black)); // Ensure clear
          
-         it.print(64, 0, id(font_small), TextAlign::TOP_CENTER, "- SETTINGS -");
+         it.print(64, 0, id(font_small), id(my_color_white), TextAlign::TOP_CENTER, "- SETTINGS -");
          
          // Draw Battery % in top right
-         it.printf(127, 0, id(font_small), TextAlign::TOP_RIGHT, "%.0f%%", id(battery_percent));
+         it.printf(127, 0, id(font_small), id(my_color_white), TextAlign::TOP_RIGHT, "%.0f%%", id(battery_percent));
          
-         int y_base = 20;
+         // Draw WiFi Signal in top left
+         if (id(wifi_signal_sensor).has_state()) {
+             it.printf(0, 0, id(font_small), id(my_color_white), TextAlign::TOP_LEFT, "%.0f dB", id(wifi_signal_sensor).state);
+         }
          
-         for (int i = 0; i < 3; i++) {
+         int y_base = 16;
+         int current_y = y_base;
+         
+          for (int i = 0; i < 4; i++) { // Show 4 items on screen
               int current_item = (id(settings_index) - 1 + i + 10) % 10;
-              int y_pos = y_base + (i * 15);
               
               // Draw Caret
-              auto current_font = (id(settings_index) == current_item) ? id(font_header) : id(font_small);
-
-              if (id(settings_index) == current_item) 
-                  it.print(0, y_pos, current_font, TextAlign::TOP_LEFT, ">");
+              auto current_font = (id(settings_index) == current_item) ? id(font_main) : id(font_tiny);
+              int item_height = (id(settings_index) == current_item) ? 16 : 10;
+              
+              if (id(settings_index) == current_item) {
+                  it.print(0, current_y, current_font, id(my_color_white), TextAlign::TOP_LEFT, ">");
+              }
                   
               // Draw Item Content
+              auto text_col = id(my_color_white);
+              int x_pos = 10;
+              TextAlign align = TextAlign::TOP_LEFT;
+              
               if (current_item == 0) { // Brightness
                   if (id(edit_mode) && id(settings_index) == 0)
-                     it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Bright: [%d%%]", id(screen_brightness));
+                     it.printf(x_pos, current_y, current_font, text_col, align, "Bright: [%d%%]", id(screen_brightness));
                   else
-                     it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Bright: %d%%", id(screen_brightness));
+                     it.printf(x_pos, current_y, current_font, text_col, align, "Bright: %d%%", id(screen_brightness));
               }
               else if (current_item == 1) { // Standby
                    if (id(edit_mode) && id(settings_index) == 1)
-                      it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Standby in: [%ds]", id(standby_duration_v2));
+                      it.printf(x_pos, current_y, current_font, text_col, align, "Standby: [%ds]", id(standby_duration_v2));
                    else
-                      it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Standby in: %ds", id(standby_duration_v2));
+                      it.printf(x_pos, current_y, current_font, text_col, align, "Standby: %ds", id(standby_duration_v2));
               }
               else if (current_item == 2) { // Sleep
                    if (id(edit_mode) && id(settings_index) == 2)
-                      it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Sleep in: [%ds]", id(sleep_timeout_v2));
+                      it.printf(x_pos, current_y, current_font, text_col, align, "Sleep: [%ds]", id(sleep_timeout_v2));
                    else
-                      it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Sleep in: %ds", id(sleep_timeout_v2));
+                      it.printf(x_pos, current_y, current_font, text_col, align, "Sleep: %ds", id(sleep_timeout_v2));
               }
               else if (current_item == 3) { // Animations
                    if (id(edit_mode) && id(settings_index) == 3)
-                      it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Anim: [%s]", (id(enable_animations_v2) == 1) ? "ON" : "OFF");
+                      it.printf(x_pos, current_y, current_font, text_col, align, "Anim: [%s]", (id(enable_animations_v2) == 1) ? "ON" : "OFF");
                    else
-                      it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Anim: %s", (id(enable_animations_v2) == 1) ? "ON" : "OFF");
+                      it.printf(x_pos, current_y, current_font, text_col, align, "Anim: %s", (id(enable_animations_v2) == 1) ? "ON" : "OFF");
               }
               else if (current_item == 4) { // Guest Mode
-                   it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Guest: %s", id(guest_mode_state).state ? "ON" : "OFF");
+                   it.printf(x_pos, current_y, current_font, text_col, align, "Guest: %s", id(guest_mode_state).state ? "ON" : "OFF");
               }
               else if (current_item == 5) { // Left Hand Mode
-                   it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "Left Hand: %s", id(left_hand_mode) ? "ON" : "OFF");
+                   it.printf(x_pos, current_y, current_font, text_col, align, "Left Hand: %s", id(left_hand_mode) ? "ON" : "OFF");
               }
               else if (current_item == 6) { // Change PIN
-                  it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "Change PIN >");
+                  it.print(x_pos, current_y, current_font, text_col, align, "Change PIN >");
               }
-              else if (current_item == 7) { // WiFi
+              else if (current_item == 7) { // WiFi (Clickable to scan)
                   if (id(wifi_ssid).has_state())
-                     it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "WiFi: %s", id(wifi_ssid).state.c_str());
+                     it.printf(x_pos, current_y, current_font, text_col, align, "WiFi: %s >", id(wifi_ssid).state.c_str());
                   else
-                     it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "WiFi: Scanning...");
+                     it.print(x_pos, current_y, current_font, text_col, align, "WiFi: Scan >");
               }
               else if (current_item == 8) { // IP
                   if (id(wifi_ip).has_state())
-                     it.printf(10, y_pos, current_font, TextAlign::TOP_LEFT, "IP: %s", id(wifi_ip).state.c_str());
+                     it.printf(x_pos, current_y, current_font, text_col, align, "IP: %s", id(wifi_ip).state.c_str());
                   else
-                     it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "IP: N/A");
+                     it.print(x_pos, current_y, current_font, text_col, align, "IP: N/A");
               }
               else if (current_item == 9) { // Exit
-                  it.print(10, y_pos, current_font, TextAlign::TOP_LEFT, "Exit");
+                  it.print(x_pos, current_y, current_font, text_col, align, "Exit");
               }
+              
+              current_y += item_height;
          }
          return;
       }
@@ -921,8 +947,9 @@ display:
       }
 
       // Draw Interface - 5 Lines
-      if (id(remote_line_1).has_state()) it.printf(64, 6, id(font_small), TextAlign::TOP_CENTER, "%s", id(remote_line_1).state.c_str());
-      if (id(remote_line_2).has_state()) it.printf(64, 17, id(font_small), TextAlign::TOP_CENTER, "%s", id(remote_line_2).state.c_str());
+      // All Left Aligned Menu
+      if (id(remote_line_1).has_state()) it.printf(10, 6, id(font_small), TextAlign::TOP_LEFT, "%s", id(remote_line_1).state.c_str());
+      if (id(remote_line_2).has_state()) it.printf(10, 17, id(font_small), TextAlign::TOP_LEFT, "%s", id(remote_line_2).state.c_str());
 
       if (id(remote_line_3).state != "") {
         int x1, y1, width, height;
@@ -945,12 +972,12 @@ display:
         it.get_text_bounds(0, 0, name_text.c_str(), id(font_header), TextAlign::TOP_LEFT, &x1, &y1, &name_width, &height);
         
         if (name_width <= max_name_width) {
-             it.print(max_name_width / 2, 28, id(font_header), id(my_color_white), TextAlign::TOP_CENTER, name_text.c_str());
+             it.print(10, 28, id(font_header), id(my_color_white), TextAlign::TOP_LEFT, name_text.c_str());
         } else {
              int limit = name_width - max_name_width + 30;
              int step = (millis() / 50) % limit;
              int x_offset = (step > (name_width - max_name_width)) ? (name_width - max_name_width) : step;
-             it.print(0 - x_offset, 28, id(font_header), id(my_color_white), TextAlign::TOP_LEFT, name_text.c_str());
+             it.print(10 - x_offset, 28, id(font_header), id(my_color_white), TextAlign::TOP_LEFT, name_text.c_str());
         }
         if (status_text != "") {
            it.filled_rectangle(128 - status_width, 28, status_width, 14, id(my_color_black));
@@ -983,8 +1010,8 @@ display:
         }
       }
 
-      if (id(remote_line_4).has_state()) it.printf(64, 41, id(font_small), TextAlign::TOP_CENTER, "%s", id(remote_line_4).state.c_str());
-      if (id(remote_line_5).has_state()) it.printf(64, 52, id(font_small), TextAlign::TOP_CENTER, "%s", id(remote_line_5).state.c_str());
+      if (id(remote_line_4).has_state()) it.printf(10, 41, id(font_small), TextAlign::TOP_LEFT, "%s", id(remote_line_4).state.c_str());
+      if (id(remote_line_5).has_state()) it.printf(10, 52, id(font_small), TextAlign::TOP_LEFT, "%s", id(remote_line_5).state.c_str());
 
 script:
   - id: clear_battery_warning
@@ -1039,6 +1066,15 @@ script:
           event: esphome.remote_action
           data:
             action: click
+
+  - id: rescan_wifi
+    then:
+      - lambda: |-
+          id(local_overlay_msg) = "Scanning WiFi...";
+          id(my_display).update();
+      - wifi.disable:
+      - delay: 1s
+      - wifi.enable:
 
   - id: send_toggle_guest_event
     mode: restart
@@ -1105,6 +1141,7 @@ script:
           id(settings_index) = 0;
           id(my_display).turn_on();
           id(is_awake) = true;
+          id(my_display).update();
 
   - id: pin_success_sequence
     then:
