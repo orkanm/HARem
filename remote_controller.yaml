@@ -4,7 +4,7 @@
 substitutions:
   name: "ha-remote"
   friendly_name: "HA Remote Controller"
-  fw_version: "v0.6.2"
+  fw_version: "v0.6.2-Fix"
 
 dashboard_import:
   package_import_url: github://orkanm/HARem/remote_controller.yaml
