@@ -1010,8 +1010,8 @@ display:
         }
       }
 
-      if (id(remote_line_4).has_state()) it.printf(10, 41, id(font_small), TextAlign::TOP_LEFT, "%s", id(remote_line_4).state.c_str());
-      if (id(remote_line_5).has_state()) it.printf(10, 52, id(font_small), TextAlign::TOP_LEFT, "%s", id(remote_line_5).state.c_str());
+      if (id(remote_line_4).has_state() && id(remote_line_4).state != "") it.printf(10, 41, id(font_small), TextAlign::TOP_LEFT, "%s", id(remote_line_4).state.c_str());
+      if (id(remote_line_5).has_state() && id(remote_line_5).state != "") it.printf(10, 52, id(font_small), TextAlign::TOP_LEFT, "%s", id(remote_line_5).state.c_str());
 
 script:
   - id: clear_battery_warning

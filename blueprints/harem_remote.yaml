@@ -207,6 +207,7 @@ action:
                   selected_entity: "{{ entities[idx % list_size] }}"
                   friendly: "{{ state_attr(selected_entity, 'friendly_name') }}"
                   current_state: "{{ states(selected_entity) }}"
+                  is_instant: "{{ selected_entity.split('.')[0] in ['scene', 'script', 'button'] }}"
                   new_message: >
                      {% if current_state == 'on' %} Turning Off...
                      {% elif current_state == 'off' %} Turning On...
@@ -221,19 +222,21 @@ action:
               - service: homeassistant.toggle
                 target: {entity_id: "{{ selected_entity }}"}
               
-              # 3. Wait for State Change (Timeout 10s)
-              - wait_template: "{{ states(selected_entity) != current_state }}"
-                timeout: "00:00:10"
-                
-              # 4. Handle Result
-              - if: "{{ not wait.completed }}"
+              # 3. Wait for State Change (skipped for instant entities)
+              - if: "{{ not is_instant }}"
                 then:
-                  - service: input_text.set_value
-                    target: {entity_id: !input overlay}
-                    data: {value: "Failed!"}
-                  - delay: "00:00:02"
+                  - wait_template: "{{ states(selected_entity) != current_state }}"
+                    timeout: "00:00:03"
+                  - if: "{{ not wait.completed }}"
+                    then:
+                      - service: input_text.set_value
+                        target: {entity_id: !input overlay}
+                        data: {value: "Failed!"}
+                      - delay: "00:00:02"
+                else:
+                  - delay: "00:00:01"
                 
-              # 5. Clear Overlay
+              # 4. Clear Overlay
               - service: input_text.set_value
                 target: {entity_id: !input overlay}
                 data: {value: ""}

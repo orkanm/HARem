@@ -96,6 +96,7 @@ automation:
                         {% endif %}
                       selected_entity: "{{ entities[idx % list_size] }}"
                       current_state: "{{ states(selected_entity) }}"
+                      is_instant: "{{ selected_entity.split('.')[0] in ['scene', 'script', 'button'] }}"
                       new_message: >
                          {% if current_state == 'on' %} Turning Off...
                          {% elif current_state == 'off' %} Turning On...
@@ -108,15 +109,18 @@ automation:
                   - service: homeassistant.toggle
                     target: {entity_id: "{{ selected_entity }}"}
                   
-                  - wait_template: "{{ states(selected_entity) != current_state }}"
-                    timeout: "00:00:10"
-                    
-                  - if: "{{ not wait.completed }}"
+                  - if: "{{ not is_instant }}"
                     then:
-                      - service: input_text.set_value
-                        target: {entity_id: input_text.harem_overlay}
-                        data: {value: "Failed!"}
-                      - delay: "00:00:02"
+                      - wait_template: "{{ states(selected_entity) != current_state }}"
+                        timeout: "00:00:03"
+                      - if: "{{ not wait.completed }}"
+                        then:
+                          - service: input_text.set_value
+                            target: {entity_id: input_text.harem_overlay}
+                            data: {value: "Failed!"}
+                          - delay: "00:00:02"
+                    else:
+                      - delay: "00:00:01"
                     
                   - service: input_text.set_value
                     target: {entity_id: input_text.harem_overlay}
