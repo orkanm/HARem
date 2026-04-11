@@ -2,6 +2,15 @@
 
 All notable changes to the HARem project will be documented in this file.
 
+## [v0.6.3] - 2026-04-12
+
+### Fixed
+- **Stale Room Name on Line 5**: Lines 4 and 5 were rendered whenever `.has_state()` returned true, which persists even after HA sends an empty string. Added `state != ""` guard matching the existing behaviour of line 3.
+- **'Activating...' Stuck for 10 Seconds (Blueprint)**: The blueprint had its own separate 10s timeout. Reduced to **3 seconds**. Additionally, `scene`, `script`, and `button` entities never produce a detectable state change after activation, so the `wait_template` always timed out and wrongly showed **Failed!**. These instant-action entities now skip the wait and clear the overlay after 1 second instead.
+- **Control Screen Persists After Deep Sleep Wake**: When the device entered deep sleep during a dimming (control mode) session, HA retained the stale `overlay` (e.g. `Bright 75%`, `MAX 100%`) and `line_5` brightness values. On wake-up, these were pushed back to the display. Fixed by (1) firing `clear_overlay` to HA on the first API reconnect after a deep sleep wake, and (2) extending the `is_stale_feedback` filter to also suppress `MAX`/`MIN` overlay texts, not just `Bright`/`Vol`.
+
+---
+
 ## [v0.6.2] - 2026-02-12
 
 ### Added
