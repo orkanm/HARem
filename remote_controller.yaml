@@ -72,6 +72,12 @@ api:
             id(local_overlay_msg) = "";
             id(my_display).update();
           }
+          // On first connect after deep sleep wake, clear any stale dimming
+          // overlay/line_5 state left in HA from before sleep
+          if (esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_UNDEFINED && !id(boot_clear_done)) {
+            id(boot_clear_done) = true;
+            id(send_clear_overlay_event)->execute();
+          }
 
 ota:
   - platform: esphome
@@ -270,6 +276,10 @@ globals:
     initial_value: 'false'
   - id: show_low_battery_warning
     type: bool
+    initial_value: 'false'
+  - id: boot_clear_done
+    type: bool
+    restore_value: no
     initial_value: 'false'
 
 # Import Home Assistant Entities
@@ -922,7 +932,7 @@ display:
          std::string text = id(remote_overlay).state;
          // HACK: If we are NOT in control mode, but the overlay is a "Control Mode" feedback
          // (starts with "Bright" or "Vol"), ignore it to prevent it from sticking.
-         bool is_stale_feedback = (!id(control_mode) && (text.find("Bright") == 0 || text.find("Vol") == 0));
+         bool is_stale_feedback = (!id(control_mode) && (text.find("Bright") == 0 || text.find("Vol") == 0 || text.find("MAX") == 0 || text.find("MIN") == 0));
          
          if (!is_stale_feedback) {
              it.fill(id(my_color_black));
