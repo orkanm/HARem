@@ -275,20 +275,26 @@ action:
               selected_entity: "{{ entities[start_idx % list_size] }}"
               domain: "{{ selected_entity.split('.')[0] }}"
               step: "{{ 10 if action == 'rotate_cw_hold' else -10 }}"
-              line_5_ent: !input line_5
+              grid: "{{ step | int | abs }}"
+              line_3_status_ent: !input line_3_status
               current_pct: >
-                 {% set val = states(line_5_ent) %}
-                 {% set stored = val | int(-1) %}
-                 {% if stored >= 0 and val != '' and val != 'unknown' %}
+                 {% set val = states(line_3_status_ent) %}
+                 {% set is_off = val.startswith('(off)') %}
+                 {% set numbers = val | regex_findall('\\((\\d+)%\\)') %}
+                 {% set stored = 0 if is_off else (numbers[0] | int(-1) if (numbers is defined and numbers | length > 0) else -1) %}
+                 {% if stored >= 0 %}
                    {{ stored }}
                  {% elif domain == 'light' %}
-                   {{ (state_attr(selected_entity, 'brightness') | int(0) / 2.55) | round(0) }}
+                   {% set raw_pct = (state_attr(selected_entity, 'brightness') | int(0) / 2.55) %}
+                   {{ ((raw_pct / grid) | round(0) * grid) | int }}
                  {% elif domain == 'media_player' %}
-                   {{ state_attr(selected_entity, 'volume_level') | float(0) * 100 }}
+                   {% set raw_pct = state_attr(selected_entity, 'volume_level') | float(0) * 100 %}
+                   {{ ((raw_pct / grid) | round(0) * grid) | int }}
                  {% else %} 0 {% endif %}
-              new_pct: >
+              new_pct: >-
                  {% set val = (current_pct | float) + (step | int) %}
-                 {{ 100 if val > 100 else (0 if val < 0 else val) }}
+                 {% set clamped = 100 if val > 100 else (0 if val < 0 else val) %}
+                 {{ clamped | int }}
               
           - choose:
               # LIGHTS
@@ -300,15 +306,27 @@ action:
                       value: >
                         {% if new_pct | int >= 100 %}MAX 100%{% elif new_pct | int <= 0 %}MIN 0%{% else %}Bright {{ new_pct | int }}%{% endif %}
                   - service: input_text.set_value
-                    target: { entity_id: !input line_5 }
+                    target: { entity_id: !input line_3_status }
                     data:
-                      value: "{{ new_pct | int }}"
-                  - service: light.turn_on
-                    target: { entity_id: "{{ selected_entity }}" }
-                    data:
-                      brightness_pct: "{{ new_pct | int }}"
-                      transition: 0.1
-                    continue_on_error: true
+                      value: "{% if new_pct | int <= 0 %}(off) *{% else %}({{ new_pct | int }}%) *{% endif %}"
+                  - delay: "00:00:00.250"
+                  - choose:
+                      - conditions: "{{ new_pct | int <= 0 }}"
+                        sequence:
+                          - service: light.turn_off
+                            target: { entity_id: "{{ selected_entity }}" }
+                            continue_on_error: true
+                    default:
+                      - service: light.turn_on
+                        target: { entity_id: "{{ selected_entity }}" }
+                        data: >
+                          {% set base = dict(brightness=((new_pct | float) * 2.55) | round(0) | int) %}
+                          {% set ct = state_attr(selected_entity, 'color_temp') %}
+                          {% if ct not in [none, 'unknown', ''] %}
+                            {% set base = dict(base, color_temp=ct) %}
+                          {% endif %}
+                          {{ base }}
+                        continue_on_error: true
               
               # MEDIA PLAYERS (Volume)
               - conditions: "{{ domain == 'media_player' }}"
@@ -319,13 +337,22 @@ action:
                       value: >
                         {% if new_pct | int >= 100 %}MAX 100%{% elif new_pct | int <= 0 %}MIN 0%{% else %}Vol {{ new_pct | int }}%{% endif %}
                   - service: input_text.set_value
-                    target: { entity_id: !input line_5 }
+                    target: { entity_id: !input line_3_status }
                     data:
-                      value: "{{ new_pct | int }}"
-                  - service: media_player.volume_set
-                    target: { entity_id: "{{ selected_entity }}" }
-                    data:
-                      volume_level: "{{ new_pct | float / 100 }}"
+                      value: "{% if new_pct | int <= 0 %}(off) *{% else %}({{ new_pct | int }}%) *{% endif %}"
+                  - delay: "00:00:00.250"
+                  - choose:
+                      - conditions: "{{ new_pct | int <= 0 }}"
+                        sequence:
+                          - service: media_player.turn_off
+                            target: { entity_id: "{{ selected_entity }}" }
+                            continue_on_error: true
+                    default:
+                      - service: media_player.volume_set
+                        target: { entity_id: "{{ selected_entity }}" }
+                        data:
+                          volume_level: "{{ new_pct | float / 100 }}"
+                        continue_on_error: true
 
           - delay: 0.05
 
@@ -448,9 +475,13 @@ action:
                     {% set final_state = states(entity) %}
                     {% if final_state == 'on' or final_state == 'playing' %}
                        {% if dom == 'light' and ns.can_dim and state_attr(entity, 'brightness') != none %}
-                          {% set final_state = ((state_attr(entity, 'brightness') | int(0) / 2.55) | round(0)) | string + '%' %}
+                          {% set raw = (state_attr(entity, 'brightness') | int(0) / 2.55) %}
+                          {% set calc = (((raw / 10) | round(0, 'common')) * 10) | int %}
+                          {% set final_state = 'off' if calc <= 0 else (calc | string + '%') %}
                        {% elif dom == 'media_player' and ns.can_dim and state_attr(entity, 'volume_level') != none %}
-                          {% set final_state = ((state_attr(entity, 'volume_level') | float(0) * 100) | round(0)) | string + '%' %}
+                          {% set raw = (state_attr(entity, 'volume_level') | float(0) * 100) %}
+                          {% set calc = (((raw / 10) | round(0, 'common')) * 10) | int %}
+                          {% set final_state = 'off' if calc <= 0 else (calc | string + '%') %}
                        {% endif %}
                     {% endif %}
                     ({{ final_state | truncate(12, True, '..') }}){{ ' *' if ns.can_dim else '' }}

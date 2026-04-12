@@ -1128,10 +1128,16 @@ script:
     then:
       - delay: 100ms
       - script.execute: idle_timer
-      - homeassistant.event:
-          event: esphome.remote_action
+      - homeassistant.service:
+          service: input_text.set_value
           data:
-            action: clear_overlay
+            entity_id: input_text.harem_overlay
+            value: " "
+      - homeassistant.service:
+          service: input_text.set_value
+          data:
+            entity_id: input_text.harem_line_5
+            value: " "
 
   - id: show_local_warning
     mode: restart
