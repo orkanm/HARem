@@ -1106,7 +1106,7 @@ script:
             action: back
 
   - id: send_rotate_cw_hold_event
-    mode: restart
+    mode: single
     then:
       - script.execute: idle_timer
       - homeassistant.event:
@@ -1115,7 +1115,7 @@ script:
             action: rotate_cw_hold
 
   - id: send_rotate_ccw_hold_event
-    mode: restart
+    mode: single
     then:
       - script.execute: idle_timer
       - homeassistant.event:
