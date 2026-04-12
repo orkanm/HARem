@@ -119,12 +119,18 @@ action:
       # ROTATE -> Change Index
       - conditions: "{{ action == 'next' and list_size > 0 }}"
         sequence:
+          - service: input_text.set_value
+            target: {entity_id: !input overlay}
+            data: {value: ""}
           - service: input_number.set_value
             target: {entity_id: !input menu_index}
             data: {value: "{{ (idx + 1) % list_size }}"}
             
       - conditions: "{{ action == 'prev' and list_size > 0 }}"
         sequence:
+          - service: input_text.set_value
+            target: {entity_id: !input overlay}
+            data: {value: ""}
           - service: input_number.set_value
             target: {entity_id: !input menu_index}
             data: {value: "{{ (idx - 1) % list_size }}"}
@@ -163,6 +169,7 @@ action:
           - service: input_text.set_value
             target: {entity_id: !input line_5}
             data: {value: ""}
+          - delay: "00:00:01"
 
       # CLICK -> Enter/Toggle
       - conditions: "{{ action == 'click' and list_size > 0 }}"
@@ -218,8 +225,16 @@ action:
                 data: {value: "{{ new_message }}"}
                 
               # 2. Perform Action
-              - service: homeassistant.toggle
-                target: {entity_id: "{{ selected_entity }}"}
+              - choose:
+                  - conditions: "{{ current_state == 'on' or current_state == 'playing' }}"
+                    sequence:
+                      - service: homeassistant.turn_off
+                        target: {entity_id: "{{ selected_entity }}"}
+                        continue_on_error: true
+                default:
+                  - service: homeassistant.turn_on
+                    target: {entity_id: "{{ selected_entity }}"}
+                    continue_on_error: true
               
               # 3. Wait for State Change (skipped for instant entities)
               - if: "{{ not is_instant }}"
@@ -293,6 +308,7 @@ action:
                     data:
                       brightness_pct: "{{ new_pct | int }}"
                       transition: 0.1
+                    continue_on_error: true
               
               # MEDIA PLAYERS (Volume)
               - conditions: "{{ domain == 'media_player' }}"
@@ -316,6 +332,9 @@ action:
       # BACK -> Exit Room
       - conditions: "{{ action == 'back' and path != 'ROOT' }}"
         sequence:
+          - service: input_text.set_value
+            target: {entity_id: !input overlay}
+            data: {value: ""}
           - variables:
               sorted_areas: "{{ areas() | sort }}"
               restore_idx: "{{ sorted_areas.index(path) if path in sorted_areas else 0 }}"
@@ -426,7 +445,15 @@ action:
                          {% set ns.can_dim = true %}
                        {% endif %}
                     {% endif %}
-                    ({{ states(entity) | truncate(12, True, '..') }}){{ ' *' if ns.can_dim else '' }}
+                    {% set final_state = states(entity) %}
+                    {% if final_state == 'on' or final_state == 'playing' %}
+                       {% if dom == 'light' and ns.can_dim and state_attr(entity, 'brightness') != none %}
+                          {% set final_state = ((state_attr(entity, 'brightness') | int(0) / 2.55) | round(0)) | string + '%' %}
+                       {% elif dom == 'media_player' and ns.can_dim and state_attr(entity, 'volume_level') != none %}
+                          {% set final_state = ((state_attr(entity, 'volume_level') | float(0) * 100) | round(0)) | string + '%' %}
+                       {% endif %}
+                    {% endif %}
+                    ({{ final_state | truncate(12, True, '..') }}){{ ' *' if ns.can_dim else '' }}
               - service: input_text.set_value
                 target: {entity_id: !input line_4}
                 data: {value: "{{ state_attr(list[(idx + 1) % list|length], 'friendly_name') if list|length > 1 else '' }}"}

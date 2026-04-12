@@ -92,7 +92,7 @@ The HARem PCB is designed to be compact and easy to assemble, housing the ESP32-
         > `7knRB3/EL4Fq8Foul7Yhv+pcABzyLXHSQxa9bTzzQqg=`
     *   > [!WARNING]
         > This key is **publicly known**. For security, you should change it in your own configuration and perform an [OTA update](https://esphome.io/components/ota.html) as soon as the device is connected to your Home Assistant.
-    *   Follow the [Setup Guide](docs/generic_menu_setup.md) to create Helpers and Automation.
+    *   Follow the [Setup Guide](docs/generic_menu_setup.md) to create the required Helpers and import the logic Blueprint.
 
 ## 📖 Extended Documentation
 *   **[Setup Guide](docs/generic_menu_setup.md)**: How to configure Home Assistant.
