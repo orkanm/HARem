@@ -77,6 +77,7 @@ api:
           if (esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_UNDEFINED && !id(boot_clear_done)) {
             id(boot_clear_done) = true;
             id(send_clear_overlay_event)->execute();
+            id(send_refresh_event)->execute();
           }
 
 ota:
@@ -311,6 +312,7 @@ binary_sensor:
           // If we were asleep (screen off), wake up but ignore the click
           if (!id(is_awake)) {
               id(idle_timer)->execute(); // Turn on screen, set is_awake=true
+              id(send_refresh_event)->execute();
               return;
           }
           
@@ -1138,6 +1140,14 @@ script:
           data:
             entity_id: input_text.harem_line_5
             value: " "
+
+  - id: send_refresh_event
+    mode: restart
+    then:
+      - homeassistant.event:
+          event: esphome.remote_action
+          data:
+            action: refresh
 
   - id: show_local_warning
     mode: restart

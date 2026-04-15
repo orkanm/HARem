@@ -240,7 +240,7 @@ action:
               - if: "{{ not is_instant }}"
                 then:
                   - wait_template: "{{ states(selected_entity) != current_state }}"
-                    timeout: "00:00:03"
+                    timeout: "00:00:05"
                   - if: "{{ not wait.completed }}"
                     then:
                       - service: input_text.set_value
