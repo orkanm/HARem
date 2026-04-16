@@ -72,6 +72,13 @@ api:
             id(local_overlay_msg) = "";
             id(my_display).update();
           }
+          // On first connect after deep sleep wake, clear any stale dimming
+          // overlay/line_5 state left in HA from before sleep
+          if (esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_UNDEFINED && !id(boot_clear_done)) {
+            id(boot_clear_done) = true;
+            id(send_clear_overlay_event)->execute();
+            id(send_refresh_event)->execute();
+          }
 
 ota:
   - platform: esphome
@@ -271,6 +278,10 @@ globals:
   - id: show_low_battery_warning
     type: bool
     initial_value: 'false'
+  - id: boot_clear_done
+    type: bool
+    restore_value: no
+    initial_value: 'false'
 
 # Import Home Assistant Entities
 binary_sensor:
@@ -301,6 +312,7 @@ binary_sensor:
           // If we were asleep (screen off), wake up but ignore the click
           if (!id(is_awake)) {
               id(idle_timer)->execute(); // Turn on screen, set is_awake=true
+              id(send_refresh_event)->execute();
               return;
           }
           
@@ -922,7 +934,7 @@ display:
          std::string text = id(remote_overlay).state;
          // HACK: If we are NOT in control mode, but the overlay is a "Control Mode" feedback
          // (starts with "Bright" or "Vol"), ignore it to prevent it from sticking.
-         bool is_stale_feedback = (!id(control_mode) && (text.find("Bright") == 0 || text.find("Vol") == 0));
+         bool is_stale_feedback = (!id(control_mode) && (text.find("Bright") == 0 || text.find("Vol") == 0 || text.find("MAX") == 0 || text.find("MIN") == 0));
          
          if (!is_stale_feedback) {
              it.fill(id(my_color_black));
@@ -1010,8 +1022,8 @@ display:
         }
       }
 
-      if (id(remote_line_4).has_state()) it.printf(10, 41, id(font_small), TextAlign::TOP_LEFT, "%s", id(remote_line_4).state.c_str());
-      if (id(remote_line_5).has_state()) it.printf(10, 52, id(font_small), TextAlign::TOP_LEFT, "%s", id(remote_line_5).state.c_str());
+      if (id(remote_line_4).has_state() && id(remote_line_4).state != "") it.printf(10, 41, id(font_small), TextAlign::TOP_LEFT, "%s", id(remote_line_4).state.c_str());
+      if (id(remote_line_5).has_state() && id(remote_line_5).state != "") it.printf(10, 52, id(font_small), TextAlign::TOP_LEFT, "%s", id(remote_line_5).state.c_str());
 
 script:
   - id: clear_battery_warning
@@ -1096,7 +1108,7 @@ script:
             action: back
 
   - id: send_rotate_cw_hold_event
-    mode: restart
+    mode: single
     then:
       - script.execute: idle_timer
       - homeassistant.event:
@@ -1105,7 +1117,7 @@ script:
             action: rotate_cw_hold
 
   - id: send_rotate_ccw_hold_event
-    mode: restart
+    mode: single
     then:
       - script.execute: idle_timer
       - homeassistant.event:
@@ -1118,10 +1130,24 @@ script:
     then:
       - delay: 100ms
       - script.execute: idle_timer
+      - homeassistant.service:
+          service: input_text.set_value
+          data:
+            entity_id: input_text.harem_overlay
+            value: " "
+      - homeassistant.service:
+          service: input_text.set_value
+          data:
+            entity_id: input_text.harem_line_5
+            value: " "
+
+  - id: send_refresh_event
+    mode: restart
+    then:
       - homeassistant.event:
           event: esphome.remote_action
           data:
-            action: clear_overlay
+            action: refresh
 
   - id: show_local_warning
     mode: restart

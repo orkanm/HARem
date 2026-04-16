@@ -66,8 +66,7 @@ blueprint:
           multiple: true
   
 
-mode: queued
-max: 20
+mode: restart
 
 trigger:
   - platform: event
@@ -120,12 +119,18 @@ action:
       # ROTATE -> Change Index
       - conditions: "{{ action == 'next' and list_size > 0 }}"
         sequence:
+          - service: input_text.set_value
+            target: {entity_id: !input overlay}
+            data: {value: ""}
           - service: input_number.set_value
             target: {entity_id: !input menu_index}
             data: {value: "{{ (idx + 1) % list_size }}"}
             
       - conditions: "{{ action == 'prev' and list_size > 0 }}"
         sequence:
+          - service: input_text.set_value
+            target: {entity_id: !input overlay}
+            data: {value: ""}
           - service: input_number.set_value
             target: {entity_id: !input menu_index}
             data: {value: "{{ (idx - 1) % list_size }}"}
@@ -164,6 +169,7 @@ action:
           - service: input_text.set_value
             target: {entity_id: !input line_5}
             data: {value: ""}
+          - delay: "00:00:01"
 
       # CLICK -> Enter/Toggle
       - conditions: "{{ action == 'click' and list_size > 0 }}"
@@ -207,6 +213,7 @@ action:
                   selected_entity: "{{ entities[idx % list_size] }}"
                   friendly: "{{ state_attr(selected_entity, 'friendly_name') }}"
                   current_state: "{{ states(selected_entity) }}"
+                  is_instant: "{{ selected_entity.split('.')[0] in ['scene', 'script', 'button'] }}"
                   new_message: >
                      {% if current_state == 'on' %} Turning Off...
                      {% elif current_state == 'off' %} Turning On...
@@ -218,22 +225,32 @@ action:
                 data: {value: "{{ new_message }}"}
                 
               # 2. Perform Action
-              - service: homeassistant.toggle
-                target: {entity_id: "{{ selected_entity }}"}
+              - choose:
+                  - conditions: "{{ current_state == 'on' or current_state == 'playing' }}"
+                    sequence:
+                      - service: homeassistant.turn_off
+                        target: {entity_id: "{{ selected_entity }}"}
+                        continue_on_error: true
+                default:
+                  - service: homeassistant.turn_on
+                    target: {entity_id: "{{ selected_entity }}"}
+                    continue_on_error: true
               
-              # 3. Wait for State Change (Timeout 10s)
-              - wait_template: "{{ states(selected_entity) != current_state }}"
-                timeout: "00:00:10"
-                
-              # 4. Handle Result
-              - if: "{{ not wait.completed }}"
+              # 3. Wait for State Change (skipped for instant entities)
+              - if: "{{ not is_instant }}"
                 then:
-                  - service: input_text.set_value
-                    target: {entity_id: !input overlay}
-                    data: {value: "Failed!"}
-                  - delay: "00:00:02"
+                  - wait_template: "{{ states(selected_entity) != current_state }}"
+                    timeout: "00:00:05"
+                  - if: "{{ not wait.completed }}"
+                    then:
+                      - service: input_text.set_value
+                        target: {entity_id: !input overlay}
+                        data: {value: "Failed!"}
+                      - delay: "00:00:02"
+                else:
+                  - delay: "00:00:01"
                 
-              # 5. Clear Overlay
+              # 4. Clear Overlay
               - service: input_text.set_value
                 target: {entity_id: !input overlay}
                 data: {value: ""}
@@ -258,62 +275,93 @@ action:
               selected_entity: "{{ entities[start_idx % list_size] }}"
               domain: "{{ selected_entity.split('.')[0] }}"
               step: "{{ 10 if action == 'rotate_cw_hold' else -10 }}"
-              line_5_ent: !input line_5
+              grid: "{{ step | int | abs }}"
+              line_3_status_ent: !input line_3_status
               current_pct: >
-                 {% set val = states(line_5_ent) %}
-                 {% set stored = val | int(-1) %}
-                 {% if stored >= 0 and val != '' and val != 'unknown' %}
+                 {% set val = states(line_3_status_ent) %}
+                 {% set is_off = val.startswith('(off)') %}
+                 {% set numbers = val | regex_findall('\\((\\d+)%\\)') %}
+                 {% set stored = 0 if is_off else (numbers[0] | int(-1) if (numbers is defined and numbers | length > 0) else -1) %}
+                 {% if stored >= 0 %}
                    {{ stored }}
                  {% elif domain == 'light' %}
-                   {{ (state_attr(selected_entity, 'brightness') | int(0) / 2.55) | round(0) }}
+                   {% set raw_pct = (state_attr(selected_entity, 'brightness') | int(0) / 2.55) %}
+                   {{ ((raw_pct / grid) | round(0) * grid) | int }}
                  {% elif domain == 'media_player' %}
-                   {{ state_attr(selected_entity, 'volume_level') | float(0) * 100 }}
+                   {% set raw_pct = state_attr(selected_entity, 'volume_level') | float(0) * 100 %}
+                   {{ ((raw_pct / grid) | round(0) * grid) | int }}
                  {% else %} 0 {% endif %}
-              new_pct: >
+              new_pct: >-
                  {% set val = (current_pct | float) + (step | int) %}
-                 {{ 100 if val > 100 else (0 if val < 0 else val) }}
+                 {% set clamped = 100 if val > 100 else (0 if val < 0 else val) %}
+                 {{ clamped | int }}
               
           - choose:
               # LIGHTS
               - conditions: "{{ domain == 'light' }}"
                 sequence:
-                  - service: light.turn_on
-                    target: { entity_id: "{{ selected_entity }}" }
-                    data:
-                      brightness_step_pct: "{{ step }}"
-                      transition: 0.1
                   - service: input_text.set_value
                     target: { entity_id: !input overlay }
                     data:
                       value: >
                         {% if new_pct | int >= 100 %}MAX 100%{% elif new_pct | int <= 0 %}MIN 0%{% else %}Bright {{ new_pct | int }}%{% endif %}
                   - service: input_text.set_value
-                    target: { entity_id: !input line_5 }
+                    target: { entity_id: !input line_3_status }
                     data:
-                      value: "{{ new_pct | int }}"
+                      value: "{% if new_pct | int <= 0 %}(off) *{% else %}({{ new_pct | int }}%) *{% endif %}"
+                  - delay: "00:00:00.250"
+                  - choose:
+                      - conditions: "{{ new_pct | int <= 0 }}"
+                        sequence:
+                          - service: light.turn_off
+                            target: { entity_id: "{{ selected_entity }}" }
+                            continue_on_error: true
+                    default:
+                      - service: light.turn_on
+                        target: { entity_id: "{{ selected_entity }}" }
+                        data: >
+                          {% set base = dict(brightness=((new_pct | float) * 2.55) | round(0) | int) %}
+                          {% set ct = state_attr(selected_entity, 'color_temp') %}
+                          {% if ct not in [none, 'unknown', ''] %}
+                            {% set base = dict(base, color_temp=ct) %}
+                          {% endif %}
+                          {{ base }}
+                        continue_on_error: true
               
               # MEDIA PLAYERS (Volume)
               - conditions: "{{ domain == 'media_player' }}"
                 sequence:
-                  - service: media_player.volume_set
-                    target: { entity_id: "{{ selected_entity }}" }
-                    data:
-                      volume_level: "{{ (state_attr(selected_entity, 'volume_level') | float(0)) + (step / 100.0) }}"
                   - service: input_text.set_value
                     target: { entity_id: !input overlay }
                     data:
                       value: >
                         {% if new_pct | int >= 100 %}MAX 100%{% elif new_pct | int <= 0 %}MIN 0%{% else %}Vol {{ new_pct | int }}%{% endif %}
                   - service: input_text.set_value
-                    target: { entity_id: !input line_5 }
+                    target: { entity_id: !input line_3_status }
                     data:
-                      value: "{{ new_pct | int }}"
+                      value: "{% if new_pct | int <= 0 %}(off) *{% else %}({{ new_pct | int }}%) *{% endif %}"
+                  - delay: "00:00:00.250"
+                  - choose:
+                      - conditions: "{{ new_pct | int <= 0 }}"
+                        sequence:
+                          - service: media_player.turn_off
+                            target: { entity_id: "{{ selected_entity }}" }
+                            continue_on_error: true
+                    default:
+                      - service: media_player.volume_set
+                        target: { entity_id: "{{ selected_entity }}" }
+                        data:
+                          volume_level: "{{ new_pct | float / 100 }}"
+                        continue_on_error: true
 
           - delay: 0.05
 
       # BACK -> Exit Room
       - conditions: "{{ action == 'back' and path != 'ROOT' }}"
         sequence:
+          - service: input_text.set_value
+            target: {entity_id: !input overlay}
+            data: {value: ""}
           - variables:
               sorted_areas: "{{ areas() | sort }}"
               restore_idx: "{{ sorted_areas.index(path) if path in sorted_areas else 0 }}"
@@ -324,112 +372,127 @@ action:
             target: {entity_id: !input menu_path}
             data: {value: "ROOT"}
 
-  # 2. UPDATE DISPLAY
-  - variables:
-      path: "{{ states(path_entity) }}" 
-      idx: "{{ states(idx_entity) | int }}"
-      guest_ents: !input guest_included_entities
-  
-  - if: "{{ path == 'ROOT' or path == '' }}"
+  # 2. UPDATE DISPLAY (skip for rotation — overlay is shown, line_5 is the pct tracker)
+  - if: "{{ action not in ['rotate_cw_hold', 'rotate_ccw_hold'] }}"
     then:
       - variables:
-          gm: "{{ guest_switch_entity }}"
-          is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
-          list: >
-            {% if is_guest %}
-               {% set ns = namespace(areas=[]) %}
-               {% for ent in guest_ents %}
-                 {% set a = area_id(ent) %}
-                 {% if a != none and a not in ns.areas %}
-                   {% set ns.areas = ns.areas + [a] %}
-                 {% endif %}
-               {% endfor %}
-               {{ ns.areas | sort }}
-            {% else %}
-               {{ areas() | sort }}
-            {% endif %}
-      - if: "{{ list | length > 0 }}"
-        then:
-          - service: input_text.set_value
-            target: {entity_id: !input line_1}
-            data: {value: "{{ area_name(list[(idx - 2) % list|length]) if list|length > 2 else '' }}"}
-          - service: input_text.set_value
-            target: {entity_id: !input line_2}
-            data: {value: "{{ area_name(list[(idx - 1) % list|length]) if list|length > 1 else '' }}"}
-          - service: input_text.set_value
-            target: {entity_id: !input line_3}
-            data: {value: "> {{ area_name(list[idx % list|length]) }}"}
-          - service: input_text.set_value
-            target: {entity_id: !input line_3_status}
-            data: {value: ""}
-          - service: input_text.set_value
-            target: {entity_id: !input line_4}
-            data: {value: "{{ area_name(list[(idx + 1) % list|length]) if list|length > 1 else '' }}"}
-          - service: input_text.set_value
-            target: {entity_id: !input line_5}
-            data: {value: "{{ area_name(list[(idx + 2) % list|length]) if list|length > 2 else '' }}"}
-        else:
-           - service: input_text.set_value
-             target: {entity_id: !input line_3}
-             data: {value: "No Areas Found"}
+          path: "{{ states(path_entity) }}" 
+          idx: "{{ states(idx_entity) | int }}"
+          guest_ents: !input guest_included_entities
 
-    else:
-      - variables:
-          gm: "{{ guest_switch_entity }}"
-          is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
-          list: >
-            {% set base = area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | list %}
-            {% if is_guest %}
-              {{ base | select('in', guest_ents) | list | sort }}
-            {% else %}
-              {{ base | sort }}
-            {% endif %}
-      - if: "{{ list | length > 0 }}"
+      - if: "{{ path == 'ROOT' or path == '' }}"
         then:
-          - service: input_text.set_value
-            target: {entity_id: !input line_1}
-            data: {value: "{{ state_attr(list[(idx - 2) % list|length], 'friendly_name') if list|length > 2 else '' }}"}
-          - service: input_text.set_value
-            target: {entity_id: !input line_2}
-            data: {value: "{{ state_attr(list[(idx - 1) % list|length], 'friendly_name') if list|length > 1 else '' }}"}
-          - service: input_text.set_value
-            target: {entity_id: !input line_3}
-            data: {value: "> {{ state_attr(list[idx % list|length], 'friendly_name') }}"}
-          - service: input_text.set_value
-            target: {entity_id: !input line_3_status}
-            data:
-              value: >
-                {% set entity = list[idx % list|length] %}
-                {% set dom = entity.split('.')[0] %}
-                {% set ns = namespace(can_dim=false) %}
-                {% if dom == 'light' %}
-                  {# Check for brightness support bit 0x01 (1) #}
-                  {% if (state_attr(entity, 'supported_features') | int(0) | bitwise_and(1)) > 0 %}
-                    {% set ns.can_dim = true %}
-                  {% endif %}
-                  {# Check unique color modes #}
-                  {% set modes = state_attr(entity, 'supported_color_modes') %}
-                  {% if modes %}
-                    {% for m in modes %}
-                      {% if m != 'onoff' %}
-                         {% set ns.can_dim = true %}
-                      {% endif %}
-                    {% endfor %}
-                  {% endif %}
-                {% elif dom == 'media_player' %}
-                   {# Check for volume_set bit 0x04 (4) #}
-                   {% if (state_attr(entity, 'supported_features') | int(0) | bitwise_and(4)) > 0 %}
-                     {% set ns.can_dim = true %}
-                   {% endif %}
+          - variables:
+              gm: "{{ guest_switch_entity }}"
+              is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
+              list: >
+                {% if is_guest %}
+                   {% set ns = namespace(areas=[]) %}
+                   {% for ent in guest_ents %}
+                     {% set a = area_id(ent) %}
+                     {% if a != none and a not in ns.areas %}
+                       {% set ns.areas = ns.areas + [a] %}
+                     {% endif %}
+                   {% endfor %}
+                   {{ ns.areas | sort }}
+                {% else %}
+                   {{ areas() | sort }}
                 {% endif %}
-                ({{ states(entity) | truncate(12, True, '..') }}){{ ' *' if ns.can_dim else '' }}
-          - service: input_text.set_value
-            target: {entity_id: !input line_4}
-            data: {value: "{{ state_attr(list[(idx + 1) % list|length], 'friendly_name') if list|length > 1 else '' }}"}
-          - service: input_text.set_value
-            target: {entity_id: !input line_5}
-            data: {value: "{{ state_attr(list[(idx + 2) % list|length], 'friendly_name') if list|length > 2 else '' }}"}
+          - if: "{{ list | length > 0 }}"
+            then:
+              - service: input_text.set_value
+                target: {entity_id: !input line_1}
+                data: {value: "{{ area_name(list[(idx - 2) % list|length]) if list|length > 2 else '' }}"}
+              - service: input_text.set_value
+                target: {entity_id: !input line_2}
+                data: {value: "{{ area_name(list[(idx - 1) % list|length]) if list|length > 1 else '' }}"}
+              - service: input_text.set_value
+                target: {entity_id: !input line_3}
+                data: {value: "> {{ area_name(list[idx % list|length]) }}"}
+              - service: input_text.set_value
+                target: {entity_id: !input line_3_status}
+                data: {value: ""}
+              - service: input_text.set_value
+                target: {entity_id: !input line_4}
+                data: {value: "{{ area_name(list[(idx + 1) % list|length]) if list|length > 1 else '' }}"}
+              - service: input_text.set_value
+                target: {entity_id: !input line_5}
+                data: {value: "{{ area_name(list[(idx + 2) % list|length]) if list|length > 2 else '' }}"}
+            else:
+               - service: input_text.set_value
+                 target: {entity_id: !input line_3}
+                 data: {value: "No Areas Found"}
+
         else:
-           - service: input_text.set_value
-             target: {entity_id: !input line_3}
-             data: {value: "Empty Room"}
+          - variables:
+              gm: "{{ guest_switch_entity }}"
+              is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
+              list: >
+                {% set base = area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | list %}
+                {% if is_guest %}
+                  {{ base | select('in', guest_ents) | list | sort }}
+                {% else %}
+                  {{ base | sort }}
+                {% endif %}
+          - if: "{{ list | length > 0 }}"
+            then:
+              - service: input_text.set_value
+                target: {entity_id: !input line_1}
+                data: {value: "{{ state_attr(list[(idx - 2) % list|length], 'friendly_name') if list|length > 2 else '' }}"}
+              - service: input_text.set_value
+                target: {entity_id: !input line_2}
+                data: {value: "{{ state_attr(list[(idx - 1) % list|length], 'friendly_name') if list|length > 1 else '' }}"}
+              - service: input_text.set_value
+                target: {entity_id: !input line_3}
+                data: {value: "> {{ state_attr(list[idx % list|length], 'friendly_name') }}"}
+              - service: input_text.set_value
+                target: {entity_id: !input line_3_status}
+                data:
+                  value: >
+                    {% set entity = list[idx % list|length] %}
+                    {% set dom = entity.split('.')[0] %}
+                    {% set ns = namespace(can_dim=false) %}
+                    {% if dom == 'light' %}
+                      {# Check for brightness support bit 0x01 (1) #}
+                      {% if (state_attr(entity, 'supported_features') | int(0) | bitwise_and(1)) > 0 %}
+                        {% set ns.can_dim = true %}
+                      {% endif %}
+                      {# Check unique color modes #}
+                      {% set modes = state_attr(entity, 'supported_color_modes') %}
+                      {% if modes %}
+                        {% for m in modes %}
+                          {% if m != 'onoff' %}
+                             {% set ns.can_dim = true %}
+                          {% endif %}
+                        {% endfor %}
+                      {% endif %}
+                    {% elif dom == 'media_player' %}
+                       {# Check for volume_set bit 0x04 (4) #}
+                       {% if (state_attr(entity, 'supported_features') | int(0) | bitwise_and(4)) > 0 %}
+                         {% set ns.can_dim = true %}
+                       {% endif %}
+                    {% endif %}
+                    {% set final_state = states(entity) %}
+                    {% if final_state == 'on' or final_state == 'playing' %}
+                       {% if dom == 'light' and ns.can_dim and state_attr(entity, 'brightness') != none %}
+                          {% set raw = (state_attr(entity, 'brightness') | int(0) / 2.55) %}
+                          {% set calc = (((raw / 10) | round(0, 'common')) * 10) | int %}
+                          {% set final_state = 'off' if calc <= 0 else (calc | string + '%') %}
+                       {% elif dom == 'media_player' and ns.can_dim and state_attr(entity, 'volume_level') != none %}
+                          {% set raw = (state_attr(entity, 'volume_level') | float(0) * 100) %}
+                          {% set calc = (((raw / 10) | round(0, 'common')) * 10) | int %}
+                          {% set final_state = 'off' if calc <= 0 else (calc | string + '%') %}
+                       {% endif %}
+                    {% endif %}
+                    ({{ final_state | truncate(12, True, '..') }}){{ ' *' if ns.can_dim else '' }}
+              - service: input_text.set_value
+                target: {entity_id: !input line_4}
+                data: {value: "{{ state_attr(list[(idx + 1) % list|length], 'friendly_name') if list|length > 1 else '' }}"}
+              - service: input_text.set_value
+                target: {entity_id: !input line_5}
+                data: {value: "{{ state_attr(list[(idx + 2) % list|length], 'friendly_name') if list|length > 2 else '' }}"}
+            else:
+               - service: input_text.set_value
+                 target: {entity_id: !input line_3}
+                 data: {value: "Empty Room"}
+
