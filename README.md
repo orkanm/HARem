@@ -100,23 +100,9 @@ The HARem PCB is designed to be compact and easy to assemble, housing the ESP32-
 *   **[Roadmap](TODO.md)**: Planned improvements and future features.
 
 ## 🏗️ Building & Local Development
-When cloning this repository to a new PC, follow these steps to set up your environment:
+For a detailed guide on setting up your Python environment, configuring secrets, and building the project, please refer to the:
 
-1.  **Python Environment**:
-    It is recommended to use a virtual environment.
-    ```bash
-    python3 -m venv esphome_venv
-    source esphome_venv/bin/activate
-    pip install -r requirements.txt
-    ```
-2.  **Secrets Configuration**:
-    The `secrets.yaml` file is excluded from version control for security.
-    *   Copy the template: `cp secrets_example.yaml secrets.yaml`
-    *   Edit `secrets.yaml` and add your Wi-Fi credentials, API keys, and OTA passwords.
-3.  **Build and Flash**:
-    ```bash
-    esphome run remote_controller.yaml
-    ```
+👉 **[Environment Installation & Setup Guide](docs/installation.md)**
 
 ---
 *Elevate your Home Assistant experience with a remote that feels as premium as your smart home.*
