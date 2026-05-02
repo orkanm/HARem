@@ -2,6 +2,20 @@
 
 All notable changes to the HARem project will be documented in this file.
 
+## [v0.7.0] - 2026-05-02
+
+### Added
+- **UI Redesign**: Moved the vertical scrollbar to the left side and replaced the `>` bullet with a full-width outline selection box for a cleaner, modern look.
+- **UI Masking**: Implemented a vertical hardware-accelerated mask at `x=0-5` to ensure marquee text doesn't spill over into the scrollbar area.
+- **Synchronized Refresh**: Added a dedicated `refresh` event handler to the Blueprint and Remote to ensure the menu redraws instantly after adjustment overlays disappear.
+
+### Fixed
+- **Battery Logic**: Re-mapped battery percentage calculation to the correct voltage sensor and fixed the low-battery alert trigger threshold.
+- **Scrollbar Stability**: Hardened the scrollbar logic with fallback values for `menu_total` to prevent the thumb from disappearing during transient network drops.
+- **UI Artifacts**: Fixed "empty pixels" on the scrollbar corners by adjusting the selection box padding and drawing order.
+
+---
+
 ## [v0.6.3] - 2026-04-12
 
 ### Fixed
