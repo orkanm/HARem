@@ -10,7 +10,10 @@ All notable changes to the HARem project will be documented in this file.
 - **Synchronized Refresh**: Added a dedicated `refresh` event handler to the Blueprint and Remote to ensure the menu redraws instantly after adjustment overlays disappear.
 
 ### Fixed
-- **Battery Logic**: Re-mapped battery percentage calculation to the correct voltage sensor and fixed the low-battery alert trigger threshold.
+- **Battery Logic**: Re-mapped battery percentage calculation to the correct voltage sensor and fixed the low-battery alert trigger threshold. Added hysteresis logic to prevent the percentage from incorrectly increasing during small voltage bounce-backs.
+- **Battery Persistence**: Configured battery percentage and its baseline voltage to persist in RTC memory across deep sleep cycles.
+- **Overlay Rendering**: Fixed an issue where the scrollbar and selection box were incorrectly drawn over local overlay warnings (like "Not Supported !").
+- **UI Alignment**: Adjusted the top bar spacing to prevent the WiFi signal from being hidden behind the scrollbar mask and removed hyphens from the settings title to save space.
 - **Scrollbar Stability**: Hardened the scrollbar logic with fallback values for `menu_total` to prevent the thumb from disappearing during transient network drops.
 - **UI Artifacts**: Fixed "empty pixels" on the scrollbar corners by adjusting the selection box padding and drawing order.
 
