@@ -33,5 +33,11 @@ input_number:
     max: 1000
     step: 1
     mode: box
+  harem_menu_total:
+    name: "Remote: Menu Total"
+    min: 0
+    max: 1000
+    step: 1
+    mode: box
 
 

@@ -4,7 +4,7 @@
 substitutions:
   name: "ha-remote"
   friendly_name: "HA Remote Controller"
-  fw_version: "v0.6.3"
+  fw_version: "v0.7.0"
 
 dashboard_import:
   package_import_url: github://orkanm/HARem/remote_controller.yaml
@@ -14,7 +14,7 @@ esphome:
   friendly_name: HARem
   project:
     name: "orkanm.harem"
-    version: "0.6.3"
+    version: "0.7.0"
   on_boot:
     - priority: 800
       then:
@@ -76,7 +76,6 @@ api:
           // overlay/line_5 state left in HA from before sleep
           if (esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_UNDEFINED && !id(boot_clear_done)) {
             id(boot_clear_done) = true;
-            id(send_clear_overlay_event)->execute();
             id(send_refresh_event)->execute();
           }
 
@@ -344,7 +343,7 @@ binary_sensor:
             if (id(control_mode)) {
                 id(control_mode) = false;
                 id(last_control_exit) = millis();
-                id(send_clear_overlay_event)->execute();
+                id(send_refresh_event)->execute(); // Combined clear + refresh
                 id(my_display).update();
                 return;
             }
@@ -700,6 +699,14 @@ sensor:
             
             id(my_display).update();
         - script.execute: clear_battery_warning
+  
+  - platform: homeassistant
+    id: menu_index
+    entity_id: input_number.harem_menu_index
+    
+  - platform: homeassistant
+    id: menu_total
+    entity_id: input_number.harem_menu_total
 
 deep_sleep:
   id: sleep_module
@@ -759,8 +766,20 @@ display:
         
         // Breathing effect for "SLEEPING"
         float pulse = 0;
-        if (id(enable_animations_v2) == 1) pulse = sin(millis() * 0.005) * 5.0; 
-        it.print(64, 4 + pulse, id(font_header), TextAlign::TOP_CENTER, "SLEEPING");
+        if (id(enable_animations_v2) == 1) pulse = (sin(millis() * 0.003) + 1.0) / 2.0; 
+        
+        it.print(64, 8, id(font_header), TextAlign::TOP_CENTER, "SLEEPING");
+        
+        // Drifting 'z's
+        if (id(enable_animations_v2) == 1) {
+            for (int i=0; i<3; i++) {
+                uint32_t t = (millis() + i * 1200) % 3600;
+                float progress = t / 3600.0f;
+                int x_off = 15 + (int)(progress * 30);
+                int y_off = 25 - (int)(progress * 25);
+                it.print(64 + x_off, y_off, id(font_tiny), "z");
+            }
+        }
         
         it.printf(64, 34, id(font_count), TextAlign::CENTER, "%d", id(sleep_countdown));
         
@@ -849,114 +868,91 @@ display:
          if (id(wifi_signal_sensor).has_state()) {
              it.printf(0, 0, id(font_small), id(my_color_white), TextAlign::TOP_LEFT, "%.0f dB", id(wifi_signal_sensor).state);
          }
-         
-         int y_base = 16;
-         int current_y = y_base;
-         
-          for (int i = 0; i < 4; i++) { // Show 4 items on screen
+                  int y_base = 15;
+          int item_h = 16;
+          
+          for (int i = 0; i < 3; i++) { // Show 3 items centered around selection
               int current_item = (id(settings_index) - 1 + i + 10) % 10;
+              int draw_y = y_base + (i * item_h);
               
-              // Draw Caret
-              auto current_font = (id(settings_index) == current_item) ? id(font_main) : id(font_tiny);
-              int item_height = (id(settings_index) == current_item) ? 16 : 10;
-              
-              if (id(settings_index) == current_item) {
-                  it.print(0, current_y, current_font, id(my_color_white), TextAlign::TOP_LEFT, ">");
-              }
-                  
-              // Draw Item Content
               auto text_col = id(my_color_white);
               int x_pos = 10;
               TextAlign align = TextAlign::TOP_LEFT;
+              auto current_font = id(font_small);
               
               if (current_item == 0) { // Brightness
                   if (id(edit_mode) && id(settings_index) == 0)
-                     it.printf(x_pos, current_y, current_font, text_col, align, "Bright: [%d%%]", id(screen_brightness));
+                     it.printf(x_pos, draw_y, current_font, text_col, align, "Bright: [%d%%]", id(screen_brightness));
                   else
-                     it.printf(x_pos, current_y, current_font, text_col, align, "Bright: %d%%", id(screen_brightness));
+                     it.printf(x_pos, draw_y, current_font, text_col, align, "Bright: %d%%", id(screen_brightness));
               }
               else if (current_item == 1) { // Standby
                    if (id(edit_mode) && id(settings_index) == 1)
-                      it.printf(x_pos, current_y, current_font, text_col, align, "Standby: [%ds]", id(standby_duration_v2));
+                      it.printf(x_pos, draw_y, current_font, text_col, align, "Standby: [%ds]", id(standby_duration_v2));
                    else
-                      it.printf(x_pos, current_y, current_font, text_col, align, "Standby: %ds", id(standby_duration_v2));
+                      it.printf(x_pos, draw_y, current_font, text_col, align, "Standby: %ds", id(standby_duration_v2));
               }
               else if (current_item == 2) { // Sleep
                    if (id(edit_mode) && id(settings_index) == 2)
-                      it.printf(x_pos, current_y, current_font, text_col, align, "Sleep: [%ds]", id(sleep_timeout_v2));
+                      it.printf(x_pos, draw_y, current_font, text_col, align, "Sleep: [%ds]", id(sleep_timeout_v2));
                    else
-                      it.printf(x_pos, current_y, current_font, text_col, align, "Sleep: %ds", id(sleep_timeout_v2));
+                      it.printf(x_pos, draw_y, current_font, text_col, align, "Sleep: %ds", id(sleep_timeout_v2));
               }
               else if (current_item == 3) { // Animations
                    if (id(edit_mode) && id(settings_index) == 3)
-                      it.printf(x_pos, current_y, current_font, text_col, align, "Anim: [%s]", (id(enable_animations_v2) == 1) ? "ON" : "OFF");
+                      it.printf(x_pos, draw_y, current_font, text_col, align, "Anim: [%s]", (id(enable_animations_v2) == 1) ? "ON" : "OFF");
                    else
-                      it.printf(x_pos, current_y, current_font, text_col, align, "Anim: %s", (id(enable_animations_v2) == 1) ? "ON" : "OFF");
+                      it.printf(x_pos, draw_y, current_font, text_col, align, "Anim: %s", (id(enable_animations_v2) == 1) ? "ON" : "OFF");
               }
               else if (current_item == 4) { // Guest Mode
-                   it.printf(x_pos, current_y, current_font, text_col, align, "Guest: %s", id(guest_mode_state).state ? "ON" : "OFF");
+                   it.printf(x_pos, draw_y, current_font, text_col, align, "Guest: %s", id(guest_mode_state).state ? "ON" : "OFF");
               }
               else if (current_item == 5) { // Left Hand Mode
-                   it.printf(x_pos, current_y, current_font, text_col, align, "Left Hand: %s", id(left_hand_mode) ? "ON" : "OFF");
+                   it.printf(x_pos, draw_y, current_font, text_col, align, "Left Hand: %s", id(left_hand_mode) ? "ON" : "OFF");
               }
               else if (current_item == 6) { // Change PIN
-                  it.print(x_pos, current_y, current_font, text_col, align, "Change PIN >");
+                  it.print(x_pos, draw_y, current_font, text_col, align, "Change PIN >");
               }
               else if (current_item == 7) { // WiFi (Clickable to scan)
                   if (id(wifi_ssid).has_state())
-                     it.printf(x_pos, current_y, current_font, text_col, align, "WiFi: %s >", id(wifi_ssid).state.c_str());
+                     it.printf(x_pos, draw_y, current_font, text_col, align, "WiFi: %s >", id(wifi_ssid).state.c_str());
                   else
-                     it.print(x_pos, current_y, current_font, text_col, align, "WiFi: Scan >");
+                     it.print(x_pos, draw_y, current_font, text_col, align, "WiFi: Scan >");
               }
               else if (current_item == 8) { // IP
                   if (id(wifi_ip).has_state())
-                     it.printf(x_pos, current_y, current_font, text_col, align, "IP: %s", id(wifi_ip).state.c_str());
+                     it.printf(x_pos, draw_y, current_font, text_col, align, "IP: %s", id(wifi_ip).state.c_str());
                   else
-                     it.print(x_pos, current_y, current_font, text_col, align, "IP: N/A");
+                     it.print(x_pos, draw_y, current_font, text_col, align, "IP: N/A");
               }
               else if (current_item == 9) { // Exit
-                  it.print(x_pos, current_y, current_font, text_col, align, "Exit");
+                  it.print(x_pos, draw_y, current_font, text_col, align, "Exit");
               }
-              
-              current_y += item_height;
-         }
-         return;
+          }
+
+           // Thumb and mask will be drawn in the FINAL PASS at the end
       }
       
       // 0B. CHECK OVERLAY (Feedback Screen)
-      if (id(local_overlay_msg) != "") {
+      else if (id(local_overlay_msg) != "") {
          it.fill(id(my_color_black));
          it.print(64, 32, id(font_header), TextAlign::CENTER, id(local_overlay_msg).c_str());
-         return;
       }
 
-      if (id(remote_overlay).has_state() && id(remote_overlay).state != "") {
+      else if (id(remote_overlay).has_state() && id(remote_overlay).state != "") {
          std::string text = id(remote_overlay).state;
-         // HACK: If we are NOT in control mode, but the overlay is a "Control Mode" feedback
-         // (starts with "Bright" or "Vol"), ignore it to prevent it from sticking.
          bool is_stale_feedback = (!id(control_mode) && (text.find("Bright") == 0 || text.find("Vol") == 0 || text.find("MAX") == 0 || text.find("MIN") == 0));
          
          if (!is_stale_feedback) {
              it.fill(id(my_color_black));
-             
-             // Breathing pulse REMOVED
-             // float pulse = 0;
-             // if (id(enable_animations_v2) == 1) pulse = sin(millis() * 0.008) * 3.0;
-             
              if (text.find("MAX") != std::string::npos || text.find("MIN") != std::string::npos) {
                 it.print(64, 25, id(font_medium), TextAlign::TOP_CENTER, text.c_str());
              } else {
                 it.print(64, 25, id(font_header), TextAlign::TOP_CENTER, text.c_str());
              }
-             
-             // Draw Progress Bar REMOVED
-             // if (id(remote_line_5).has_state() && id(remote_line_5).state != "") { ... }
-
-             // ANIMATED BAR REMOVED
-             
-             return;
          }
       }
+      else {
 
       // Draw Interface - 5 Lines
       // All Left Aligned Menu
@@ -978,22 +974,24 @@ display:
            it.get_text_bounds(0, 0, status_text.c_str(), id(font_small), TextAlign::TOP_LEFT, &x1, &y1, &status_width, &height);
            status_width += 4;
         }
-        int max_name_width = 128 - status_width;
+
+        int max_name_width = 128 - status_width - 10;
         std::string name_text = id(remote_line_3).state;
         int name_width = 0;
-        it.get_text_bounds(0, 0, name_text.c_str(), id(font_header), TextAlign::TOP_LEFT, &x1, &y1, &name_width, &height);
+        it.get_text_bounds(0, 0, name_text.c_str(), id(font_small), TextAlign::TOP_LEFT, &x1, &y1, &name_width, &height);
         
         if (name_width <= max_name_width) {
-             it.print(10, 28, id(font_header), id(my_color_white), TextAlign::TOP_LEFT, name_text.c_str());
+             it.print(10, 29, id(font_small), id(my_color_white), TextAlign::TOP_LEFT, name_text.c_str());
         } else {
              int limit = name_width - max_name_width + 30;
              int step = (millis() / 50) % limit;
              int x_offset = (step > (name_width - max_name_width)) ? (name_width - max_name_width) : step;
-             it.print(10 - x_offset, 28, id(font_header), id(my_color_white), TextAlign::TOP_LEFT, name_text.c_str());
+             it.print(10 - x_offset, 29, id(font_small), id(my_color_white), TextAlign::TOP_LEFT, name_text.c_str());
         }
         if (status_text != "") {
-           it.filled_rectangle(128 - status_width, 28, status_width, 14, id(my_color_black));
-           it.print(128, 29, id(font_small), id(my_color_white), TextAlign::TOP_RIGHT, status_text.c_str());
+           // Small background clearing for status
+           it.filled_rectangle(128 - status_width, 29, status_width, 12, id(my_color_black));
+           it.print(126, 29, id(font_small), id(my_color_white), TextAlign::TOP_RIGHT, status_text.c_str());
         }
       } else {
         if (millis() < 3000) {
@@ -1002,28 +1000,72 @@ display:
           it.print(64, 40, id(font_small), TextAlign::TOP_CENTER, "Controller");
         } else {
           it.fill(id(my_color_black));
-          float pulse = 0;
-          if (id(enable_animations_v2) == 1) pulse = sin(millis() * 0.005) * 2.0;
-          it.print(64, 15 + pulse, id(font_header), TextAlign::TOP_CENTER, "CONNECTING");
-          int container_w = 100;
-          int bar_w = 30;
+          
+          // Loading Dots
+          std::string dots = "";
+          int dot_count = (millis() / 600) % 4;
+          for(int i=0; i<dot_count; i++) dots += ".";
+          it.printf(64, 15, id(font_header), TextAlign::TOP_CENTER, "CONNECTING%s", dots.c_str());
+
+          int container_w = 80;
           int start_x = (128 - container_w) / 2;
+          it.rectangle(start_x, 40, container_w, 3, id(my_color_white));
+
           if (id(enable_animations_v2) == 1) {
-             int t = (millis() / 8) % 200;
-             int pos = (t > 100) ? (200 - t) : t;
-             int x_bar = start_x + (int)(pos * (container_w - bar_w) / 100.0f);
-             it.rectangle(start_x, 40, container_w, 3, id(my_color_white));
-             it.filled_rectangle(x_bar, 40, bar_w, 3, id(my_color_white));
-          } else {
-             it.rectangle(start_x, 40, container_w, 3, id(my_color_white));
+             // Pulsing Center Bar
+             float p = (sin(millis() * 0.004) + 1.0) / 2.0;
+             int bar_w = 10 + (int)(p * (container_w - 10));
              it.filled_rectangle(start_x + (container_w - bar_w)/2, 40, bar_w, 3, id(my_color_white));
+          } else {
+             it.filled_rectangle(start_x + 10, 40, container_w - 20, 3, id(my_color_white));
           }
+
           it.print(64, 50, id(font_small), TextAlign::TOP_CENTER, "${fw_version}");
         }
       }
 
-      if (id(remote_line_4).has_state() && id(remote_line_4).state != "") it.printf(10, 41, id(font_small), TextAlign::TOP_LEFT, "%s", id(remote_line_4).state.c_str());
-      if (id(remote_line_5).has_state() && id(remote_line_5).state != "") it.printf(10, 52, id(font_small), TextAlign::TOP_LEFT, "%s", id(remote_line_5).state.c_str());
+      if (id(remote_line_4).has_state() && id(remote_line_4).state != "") it.printf(10, 44, id(font_small), TextAlign::TOP_LEFT, "%s", id(remote_line_4).state.c_str());
+      if (id(remote_line_5).has_state() && id(remote_line_5).state != "") it.printf(10, 54, id(font_small), TextAlign::TOP_LEFT, "%s", id(remote_line_5).state.c_str());
+
+      // --- FINAL UI PASS (Overlay & Scrollbar on top) ---
+
+      }      // --- FINAL UNIFIED UI PASS (Only when showing content) ---
+      bool has_content = (id(remote_line_3).state != "" || id(settings_mode));
+      
+      if (id(is_awake) && has_content && (id(remote_overlay).state == "" || id(remote_overlay).state == " ")) {
+          // 1. Mask left side (x=0-5) to hide marquee spillover
+          it.filled_rectangle(0, 0, 6, 64, id(my_color_black));
+
+          // 2. Draw Vertical Scroll Indicator (Track)
+          int track_start_y = id(settings_mode) ? 15 : 0;
+          it.line(2, track_start_y, 2, 63, id(my_color_white));
+
+          // 3. Draw Selection Highlight (Outline) - Moved to x=8 to avoid scrollbar artifacts
+          if (!id(settings_mode) && (id(remote_overlay).state == "" || id(remote_overlay).state == " ") && id(remote_line_3).state != "") {
+              it.rectangle(8, 28, 120, 14, id(my_color_white));
+          } else if (id(settings_mode)) {
+              it.rectangle(8, 15 + (1 * 16), 120, 16, id(my_color_white));
+          }
+
+          // 4. Draw Scroll Thumb (Location Indicator)
+          if (id(settings_mode)) {
+              int thumb_h = 12;
+              int thumb_y = 15 + (id(settings_index) * (48 - thumb_h) / 9);
+              it.filled_rectangle(0, thumb_y, 5, thumb_h, id(my_color_white));
+          } else {
+              // Ensure we have a valid total, even if HA is slow to update
+              float total = id(menu_total).has_state() ? id(menu_total).state : 6.0; 
+              if (total > 1) {
+                  float current = id(menu_index).has_state() ? id(menu_index).state : 0.0;
+                  int thumb_h = 10;
+                  int thumb_y = (int)((current / (total - 1)) * (64 - thumb_h));
+                  // Constrain y to prevent drawing out of bounds
+                  if (thumb_y < 0) thumb_y = 0;
+                  if (thumb_y > 54) thumb_y = 54;
+                  it.filled_rectangle(0, thumb_y, 5, thumb_h, id(my_color_white));
+              }
+          }
+      }
 
 script:
   - id: clear_battery_warning
@@ -1125,25 +1167,21 @@ script:
           data:
             action: rotate_ccw_hold
 
-  - id: send_clear_overlay_event
+  - id: send_refresh_event
     mode: restart
     then:
-      - delay: 100ms
       - script.execute: idle_timer
       - homeassistant.service:
           service: input_text.set_value
           data:
             entity_id: input_text.harem_overlay
-            value: " "
+            value: ""
       - homeassistant.service:
           service: input_text.set_value
           data:
             entity_id: input_text.harem_line_5
-            value: " "
-
-  - id: send_refresh_event
-    mode: restart
-    then:
+            value: ""
+      - delay: 200ms
       - homeassistant.event:
           event: esphome.remote_action
           data:

@@ -41,8 +41,9 @@ sequenceDiagram
 ### 2. High-Density Display
 *   **5 Lines of Context**:
     *   **Lines 1, 2, 4, 5**: Contextual items (Small Font 10px).
-    *   **Line 3**: Selected Item (Header Font 12px, highlighted with `>`).
-*   **Marquee Effect**: Long text on the selected line auto-scrolls (10Hz smooth animation).
+    *   **Line 3**: Selected Item (Header Font 12px, highlighted with a **full-width outline box**).
+*   **Vertical Scrollbar**: Positioned on the **left side** for better accessibility and aesthetics.
+*   **Marquee Effect**: Long text on the selected line auto-scrolls with a hardware-accelerated UI mask to prevent spillover.
 
 ### 3. Navigation Controls
 *   **Rotate**: Scroll Up/Down.
@@ -75,10 +76,11 @@ If the remote cannot connect to any configured WiFi network (e.g., you changed y
 4.  **Configure**: A portal should pop up automatically (or go to `192.168.4.1`).
 5.  **Select**: Click your new WiFi network and enter the password. The device will save it and reboot.
 
-### 8. Final Verification (v0.1)
-- **Startup**: Verified sequence (Splash -> Waiting -> v0.1).
+### 8. Final Verification (v0.7.0)
+- **Startup**: Verified sequence (Splash -> Waiting -> v0.7.0).
 - **Navigation**: "Back" button reliably returns to previous room.
-- **Display**: Long status strings are truncated; short lists use smart masking to prevent duplicates.
+- **Refresh Sync**: Explicit `refresh` event ensures the menu reappears instantly after exiting Dimming/Volume overlays.
+- **Display**: Selection highlight moved to `x=8` to ensure pixel-perfect corners and zero interference with the scrollbar.
 - **Versioning**: Centralized version management via `substitutions` block.
 
 ## 5. Next Steps

@@ -24,12 +24,15 @@ Unlike traditional smart remotes that require manual configuration of every butt
 - **Infinite Extensibility**: Complex logic is handled by Home Assistant Blueprints and Automations, keeping the hardware lightweight and responsive.
 
 ## ✨ Premium Features
-- **Modern UI**: A 5-line **1.3" OLED** interface featuring **Outfit** and **Montserrat** typography for a professional, high-end feel.
-- **Dynamic Marquee**: Long device names automatically scroll with a smooth marquee effect.
+- **Modern UI**: A 5-line **1.3" OLED** interface featuring **Outfit** and **Montserrat** typography. Includes a **left-side vertical scrollbar** and **outline-based selection highlight** for a professional feel.
+- **Dynamic Marquee**: Long device names automatically scroll with a smooth marquee effect, protected by a hardware-accelerated UI mask.
 - **Guest Mode Protection**: Secure, PIN-protected "Guest Mode" to restrict access to specific areas or devices.
 - **Visual Feedback**: Interactive animations for startup, sleep countdowns, and action confirmations.
-- **Power Intelligence**: Configurable standby and deep-sleep modes with precise battery voltage monitoring.
+- **Power Intelligence**: Configurable standby and deep-sleep modes with hardened battery voltage monitoring and low-battery alerts.
 - **Global Control**: Toggle animations and power settings directly from a local on-device menu.
+
+## 🔋 Power & Hardware Optimization (SuperMini)
+- [x] **Battery Calibration**: Corrected `GPIO0` ADC mapping and low-battery thresholds (Fixed in v0.7.0).
 
 ### 🔋 Ultra-Low Power Design
 HARem is optimized for maximum battery performance:
@@ -58,6 +61,10 @@ HARem is optimized for maximum battery performance:
     │                      [1M]                     │
     └───────────────────────┴────────▶ GND          │
 ```
+
+---
+
+## [v0.6.3] - 2026-04-12
 
 ### Pin Mapping Table
 | Component | ESP32-C3 Pin | Type | Notes |

@@ -5,7 +5,7 @@ This file tracks planned improvements and premium features for the HARem Remote 
 ## 📋 System Enhancements
 - [ ] **"About" Screen**: Add a settings item to display firmware version, system uptime, and WiFi signal strength.
 - [ ] **Haptic Feedback**: Support for a mini vibration motor for tactile feedback during encoder rotation and button clicks.
-- [ ] **WiFi Provisioning**: Implement Improv WiFi or a Captive Portal for easier setup of credentials.
+- [x] **WiFi Provisioning**: Implement Improv WiFi and Captive Portal for easier setup (Added in v0.6.2).
 
 ## ✨ Visual & UX Refinements
 - [ ] **UI Themes**: Support for switching between "Light" (Inverted) and "Dark" display modes.
@@ -18,8 +18,7 @@ This file tracks planned improvements and premium features for the HARem Remote 
 - [ ] **Advanced Power Metrics**: Track deeper battery health and discharge curves using on-device logging.
 
 ## 🔋 Power & Hardware Optimization (SuperMini)
-- [ ] **Battery Calibration**: Recalibrate `GPIO0` ADC. Current reading `1.48V` is wrong.
-    - **Code**: `multiply: 2.0` (for equal resistors).
+- [x] **Battery Calibration**: Corrected `GPIO0` ADC mapping and low-battery thresholds (Fixed in v0.7.0).
 
 ---
 *Maintained by Orkan Murat Celik*

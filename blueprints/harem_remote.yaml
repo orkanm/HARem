@@ -15,6 +15,13 @@ blueprint:
       selector:
         entity:
           domain: input_number
+    menu_total:
+      name: Menu Total Helper (Optional)
+      description: "input_number to store total items. Required for the main screen scrollbar."
+      default: none
+      selector:
+        entity:
+          domain: input_number
     line_1:
       name: Line 1 Helper
       selector:
@@ -160,8 +167,8 @@ action:
             target: {entity_id: !input line_5}
             data: {value: ""}
 
-      # NEW: Handle clear_overlay
-      - conditions: "{{ action == 'clear_overlay' }}"
+      # REFRESH -> Explicitly Redraw Screen
+      - conditions: "{{ action == 'refresh' }}"
         sequence:
           - service: input_text.set_value
             target: {entity_id: !input overlay}
@@ -169,7 +176,7 @@ action:
           - service: input_text.set_value
             target: {entity_id: !input line_5}
             data: {value: ""}
-          - delay: "00:00:01"
+          # The automation will now continue to the "UPDATE DISPLAY" section below
 
       # CLICK -> Enter/Toggle
       - conditions: "{{ action == 'click' and list_size > 0 }}"
@@ -375,10 +382,19 @@ action:
   # 2. UPDATE DISPLAY (skip for rotation — overlay is shown, line_5 is the pct tracker)
   - if: "{{ action not in ['rotate_cw_hold', 'rotate_ccw_hold'] }}"
     then:
+      - delay: { milliseconds: 100 }
       - variables:
           path: "{{ states(path_entity) }}" 
           idx: "{{ states(idx_entity) | int }}"
           guest_ents: !input guest_included_entities
+          menu_total_ent: !input menu_total
+          list_size_val: "{{ list_size }}"
+
+      - if: "{{ menu_total_ent != 'none' }}"
+        then:
+          - service: input_number.set_value
+            target: {entity_id: !input menu_total}
+            data: {value: "{{ list_size_val }}"}
 
       - if: "{{ path == 'ROOT' or path == '' }}"
         then:
@@ -408,7 +424,7 @@ action:
                 data: {value: "{{ area_name(list[(idx - 1) % list|length]) if list|length > 1 else '' }}"}
               - service: input_text.set_value
                 target: {entity_id: !input line_3}
-                data: {value: "> {{ area_name(list[idx % list|length]) }}"}
+                data: {value: "{{ area_name(list[idx % list|length]) }}"}
               - service: input_text.set_value
                 target: {entity_id: !input line_3_status}
                 data: {value: ""}
@@ -444,7 +460,7 @@ action:
                 data: {value: "{{ state_attr(list[(idx - 1) % list|length], 'friendly_name') if list|length > 1 else '' }}"}
               - service: input_text.set_value
                 target: {entity_id: !input line_3}
-                data: {value: "> {{ state_attr(list[idx % list|length], 'friendly_name') }}"}
+                data: {value: "{{ state_attr(list[idx % list|length], 'friendly_name') }}"}
               - service: input_text.set_value
                 target: {entity_id: !input line_3_status}
                 data:
