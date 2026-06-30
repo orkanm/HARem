@@ -13,7 +13,7 @@ It requires **no maintenance**—if you add a device to a Room in Home Assistant
 ## 1. Create Helpers (Choose Package or Manual)
 
 ### ✅ Option A: Drop-in Package (Recommended)
-The fastest method. Creates all 8 required helpers instantly.
+The fastest method. Creates all 11 required helpers instantly.
 1. Download [harem_package.yaml](file:///home/orquitto/Workspace/HARem/home_assistant/harem_package.yaml) and place it in your Home Assistant `/config/packages/` folder.
 2. In your `configuration.yaml`, ensure you have: `homeassistant: { packages: !include_dir_named packages }`.
 3. Restart Home Assistant.
@@ -22,14 +22,15 @@ The fastest method. Creates all 8 required helpers instantly.
 If you don't use packages, manually create these in **Settings > Devices & Services > Helpers**:
 1.  **Text Helper**: `input_text.harem_menu_path` (Name: "Remote: Menu Path")
 2.  **Number Helper**: `input_number.harem_menu_index` (Name: "Remote: Menu Index", Min: 0, Max: 1000, Step: 1)
-3.  **Text Helper**: `input_text.harem_line_1` (Name: "Remote: Line 1")
-4.  **Text Helper**: `input_text.harem_line_2` (Name: "Remote: Line 2")
-5.  **Text Helper**: `input_text.harem_line_3` (Name: "Remote: Line 3")
-6.  **Text Helper**: `input_text.harem_line_4` (Name: "Remote: Line 4")
-7.  **Text Helper**: `input_text.harem_line_5` (Name: "Remote: Line 5")
-8.  **Text Helper**: `input_text.harem_line_3_status` (Name: "Remote: Line 3 Status")
-9.  **Text Helper**: `input_text.harem_overlay` (Name: "Remote: Overlay")
-10. **Toggle Helper**: `input_boolean.harem_guest_mode` (Name: "Remote: Guest Mode")
+3.  **Number Helper**: `input_number.harem_menu_total` (Name: "Remote: Menu Total", Min: 0, Max: 1000, Step: 1)
+4.  **Text Helper**: `input_text.harem_line_1` (Name: "Remote: Line 1")
+5.  **Text Helper**: `input_text.harem_line_2` (Name: "Remote: Line 2")
+6.  **Text Helper**: `input_text.harem_line_3` (Name: "Remote: Line 3")
+7.  **Text Helper**: `input_text.harem_line_4` (Name: "Remote: Line 4")
+8.  **Text Helper**: `input_text.harem_line_5` (Name: "Remote: Line 5")
+9.  **Text Helper**: `input_text.harem_line_3_status` (Name: "Remote: Line 3 Status")
+10. **Text Helper**: `input_text.harem_overlay` (Name: "Remote: Overlay")
+11. **Toggle Helper**: `input_boolean.harem_guest_mode` (Name: "Remote: Guest Mode")
 
 ---
 

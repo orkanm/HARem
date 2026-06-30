@@ -114,12 +114,40 @@ action:
              {{ areas() | length }}
           {% endif %}
         {% else %}
-          {% set entities = area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | list %}
+          {% set raw_entities = area_entities(path) | reject('is_hidden_entity') | list %}
+          {% set p1 = raw_entities | select('match', '^(light|media_player|cover|fan|lock)[.]') | sort | list %}
+          {% set p2 = raw_entities | select('match', '^switch[.]') | sort | list %}
+          {% set p3 = raw_entities | select('match', '^(button|input_boolean|scene|script)[.]') | sort | list %}
+          {% set base = p1 + p2 + p3 %}
           {% if is_guest %}
-            {{ entities | select('in', guest_ents) | list | length }}
-          {% else %}
-            {{ entities | length }}
+            {% set base = base | select('in', guest_ents) | list %}
           {% endif %}
+          {% set ns = namespace(final=[], names=[]) %}
+          {% for ent in base %}
+            {% set name = state_attr(ent, 'friendly_name') or ent.split('.')[1] %}
+            {% if name not in ns.names %}
+              {% set dev = device_id(ent) %}
+              {% set keep = namespace(ok=true) %}
+              {% if dev != none %}
+                {% set ent_dom = ent.split('.')[0] %}
+                {% for prev in ns.final %}
+                  {% if device_id(prev) == dev %}
+                    {% set prev_dom = prev.split('.')[0] %}
+                    {% set ent_pri = 1 if ent_dom in ['light', 'media_player', 'cover', 'fan', 'lock'] else (2 if ent_dom == 'switch' else 3) %}
+                    {% set prev_pri = 1 if prev_dom in ['light', 'media_player', 'cover', 'fan', 'lock'] else (2 if prev_dom in ['switch'] else 3) %}
+                    {% if prev_pri < ent_pri %}
+                      {% set keep.ok = false %}
+                    {% endif %}
+                  {% endif %}
+                {% endfor %}
+              {% endif %}
+              {% if keep.ok %}
+                {% set ns.final = ns.final + [ent] %}
+                {% set ns.names = ns.names + [name] %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.final | length }}
         {% endif %}
 
   - choose:
@@ -195,11 +223,11 @@ action:
                            {% set ns.areas = ns.areas + [a] %}
                          {% endif %}
                        {% endfor %}
-                       {{ ns.areas | sort }}
+                       {{ ns.areas | sort | to_json }}
                     {% else %}
-                       {{ areas() | sort }}
+                       {{ areas() | sort | to_json }}
                     {% endif %}
-                  selected_area: "{{ areas_list[idx % list_size] }}"
+                  selected_area: "{{ areas_list[idx % areas_list | length] }}"
               - service: input_text.set_value
                 target: {entity_id: !input menu_path}
                 data: {value: "{{ selected_area }}"}
@@ -211,13 +239,41 @@ action:
                   gm: "{{ guest_switch_entity }}"
                   is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
                   entities: >
-                    {% set base = area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | list %}
+                    {% set raw_entities = area_entities(path) | reject('is_hidden_entity') | list %}
+                    {% set p1 = raw_entities | select('match', '^(light|media_player|cover|fan|lock)[.]') | sort | list %}
+                    {% set p2 = raw_entities | select('match', '^switch[.]') | sort | list %}
+                    {% set p3 = raw_entities | select('match', '^(button|input_boolean|scene|script)[.]') | sort | list %}
+                    {% set base = p1 + p2 + p3 %}
                     {% if is_guest %}
-                      {{ base | select('in', guest_ents) | list | sort }}
-                    {% else %}
-                      {{ base | sort }}
+                      {% set base = base | select('in', guest_ents) | list %}
                     {% endif %}
-                  selected_entity: "{{ entities[idx % list_size] }}"
+                    {% set ns = namespace(final=[], names=[]) %}
+                    {% for ent in base %}
+                      {% set name = state_attr(ent, 'friendly_name') or ent.split('.')[1] %}
+                      {% if name not in ns.names %}
+                        {% set dev = device_id(ent) %}
+                        {% set keep = namespace(ok=true) %}
+                        {% if dev != none %}
+                          {% set ent_dom = ent.split('.')[0] %}
+                          {% for prev in ns.final %}
+                            {% if device_id(prev) == dev %}
+                              {% set prev_dom = prev.split('.')[0] %}
+                              {% set ent_pri = 1 if ent_dom in ['light', 'media_player', 'cover', 'fan', 'lock'] else (2 if ent_dom == 'switch' else 3) %}
+                              {% set prev_pri = 1 if prev_dom in ['light', 'media_player', 'cover', 'fan', 'lock'] else (2 if prev_dom in ['switch'] else 3) %}
+                              {% if prev_pri < ent_pri %}
+                                {% set keep.ok = false %}
+                              {% endif %}
+                            {% endif %}
+                          {% endfor %}
+                        {% endif %}
+                        {% if keep.ok %}
+                          {% set ns.final = ns.final + [ent] %}
+                          {% set ns.names = ns.names + [name] %}
+                        {% endif %}
+                      {% endif %}
+                    {% endfor %}
+                    {{ ns.final | to_json }}
+                  selected_entity: "{{ entities[idx % entities | length] }}"
                   friendly: "{{ state_attr(selected_entity, 'friendly_name') }}"
                   current_state: "{{ states(selected_entity) }}"
                   is_instant: "{{ selected_entity.split('.')[0] in ['scene', 'script', 'button'] }}"
@@ -273,13 +329,41 @@ action:
               gm: "{{ guest_switch_entity }}"
               is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
               entities: >
-                {% set base = area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | list %}
+                {% set raw_entities = area_entities(path) | reject('is_hidden_entity') | list %}
+                {% set p1 = raw_entities | select('match', '^(light|media_player|cover|fan|lock)[.]') | sort | list %}
+                {% set p2 = raw_entities | select('match', '^switch[.]') | sort | list %}
+                {% set p3 = raw_entities | select('match', '^(button|input_boolean|scene|script)[.]') | sort | list %}
+                {% set base = p1 + p2 + p3 %}
                 {% if is_guest %}
-                  {{ base | select('in', guest_ents) | list | sort }}
-                {% else %}
-                  {{ base | sort }}
+                  {% set base = base | select('in', guest_ents) | list %}
                 {% endif %}
-              selected_entity: "{{ entities[start_idx % list_size] }}"
+                {% set ns = namespace(final=[], names=[]) %}
+                {% for ent in base %}
+                  {% set name = state_attr(ent, 'friendly_name') or ent.split('.')[1] %}
+                  {% if name not in ns.names %}
+                    {% set dev = device_id(ent) %}
+                    {% set keep = namespace(ok=true) %}
+                    {% if dev != none %}
+                      {% set ent_dom = ent.split('.')[0] %}
+                      {% for prev in ns.final %}
+                        {% if device_id(prev) == dev %}
+                          {% set prev_dom = prev.split('.')[0] %}
+                          {% set ent_pri = 1 if ent_dom in ['light', 'media_player', 'cover', 'fan', 'lock'] else (2 if ent_dom == 'switch' else 3) %}
+                          {% set prev_pri = 1 if prev_dom in ['light', 'media_player', 'cover', 'fan', 'lock'] else (2 if prev_dom in ['switch'] else 3) %}
+                          {% if prev_pri < ent_pri %}
+                            {% set keep.ok = false %}
+                          {% endif %}
+                        {% endif %}
+                      {% endfor %}
+                    {% endif %}
+                    {% if keep.ok %}
+                      {% set ns.final = ns.final + [ent] %}
+                      {% set ns.names = ns.names + [name] %}
+                    {% endif %}
+                  {% endif %}
+                {% endfor %}
+                {{ ns.final | to_json }}
+              selected_entity: "{{ entities[start_idx % entities | length] }}"
               domain: "{{ selected_entity.split('.')[0] }}"
               step: "{{ 10 if action == 'rotate_cw_hold' else -10 }}"
               grid: "{{ step | int | abs }}"
@@ -410,105 +494,286 @@ action:
                        {% set ns.areas = ns.areas + [a] %}
                      {% endif %}
                    {% endfor %}
-                   {{ ns.areas | sort }}
+                   {{ ns.areas | sort | to_json }}
                 {% else %}
-                   {{ areas() | sort }}
+                   {{ areas() | sort | to_json }}
                 {% endif %}
           - if: "{{ list | length > 0 }}"
             then:
               - service: input_text.set_value
                 target: {entity_id: !input line_1}
-                data: {value: "{{ area_name(list[(idx - 2) % list|length]) if list|length > 2 else '' }}"}
+                data:
+                  value: >-
+                    {% if list|length >= 5 %}
+                      {{ area_name(list[(idx - 2) % list|length]) or '' }}
+                    {% else %}
+                      {% set target = idx - 2 %}
+                      {% if target >= 0 %}
+                        {% for item in list %}
+                          {%- if loop.index0 == target -%}
+                            {{ area_name(item) or '' }}
+                          {%- endif -%}
+                        {% endfor %}
+                      {% endif %}
+                    {% endif %}
               - service: input_text.set_value
                 target: {entity_id: !input line_2}
-                data: {value: "{{ area_name(list[(idx - 1) % list|length]) if list|length > 1 else '' }}"}
+                data:
+                  value: >-
+                    {% if list|length >= 5 %}
+                      {{ area_name(list[(idx - 1) % list|length]) or '' }}
+                    {% else %}
+                      {% set target = idx - 1 %}
+                      {% if target >= 0 %}
+                        {% for item in list %}
+                          {%- if loop.index0 == target -%}
+                            {{ area_name(item) or '' }}
+                          {%- endif -%}
+                        {% endfor %}
+                      {% endif %}
+                    {% endif %}
               - service: input_text.set_value
                 target: {entity_id: !input line_3}
-                data: {value: "{{ area_name(list[idx % list|length]) }}"}
+                data:
+                  value: >-
+                    {% if list|length >= 5 %}
+                      {{ area_name(list[idx % list|length]) or '' }}
+                    {% else %}
+                      {% for item in list %}
+                        {%- if loop.index0 == idx -%}
+                          {{ area_name(item) or '' }}
+                        {%- endif -%}
+                      {% endfor %}
+                    {% endif %}
               - service: input_text.set_value
                 target: {entity_id: !input line_3_status}
                 data: {value: ""}
               - service: input_text.set_value
                 target: {entity_id: !input line_4}
-                data: {value: "{{ area_name(list[(idx + 1) % list|length]) if list|length > 1 else '' }}"}
+                data:
+                  value: >-
+                    {% if list|length >= 5 %}
+                      {{ area_name(list[(idx + 1) % list|length]) or '' }}
+                    {% else %}
+                      {% set target = idx + 1 %}
+                      {% for item in list %}
+                        {%- if loop.index0 == target -%}
+                          {{ area_name(item) or '' }}
+                        {%- endif -%}
+                      {% endfor %}
+                    {% endif %}
               - service: input_text.set_value
                 target: {entity_id: !input line_5}
-                data: {value: "{{ area_name(list[(idx + 2) % list|length]) if list|length > 2 else '' }}"}
+                data:
+                  value: >-
+                    {% if list|length >= 5 %}
+                      {{ area_name(list[(idx + 2) % list|length]) or '' }}
+                    {% else %}
+                      {% set target = idx + 2 %}
+                      {% for item in list %}
+                        {%- if loop.index0 == target -%}
+                          {{ area_name(item) or '' }}
+                        {%- endif -%}
+                      {% endfor %}
+                    {% endif %}
             else:
+               - service: input_text.set_value
+                 target: {entity_id: !input line_1}
+                 data: {value: ""}
+               - service: input_text.set_value
+                 target: {entity_id: !input line_2}
+                 data: {value: ""}
                - service: input_text.set_value
                  target: {entity_id: !input line_3}
                  data: {value: "No Areas Found"}
+               - service: input_text.set_value
+                 target: {entity_id: !input line_3_status}
+                 data: {value: ""}
+               - service: input_text.set_value
+                 target: {entity_id: !input line_4}
+                 data: {value: ""}
+               - service: input_text.set_value
+                 target: {entity_id: !input line_5}
+                 data: {value: ""}
 
         else:
           - variables:
               gm: "{{ guest_switch_entity }}"
               is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
               list: >
-                {% set base = area_entities(path) | select('match', '^(light|switch|input_boolean|scene|script|button|cover|fan|lock|media_player)[.]') | list %}
+                {% set raw_entities = area_entities(path) | reject('is_hidden_entity') | list %}
+                {% set p1 = raw_entities | select('match', '^(light|media_player|cover|fan|lock)[.]') | sort | list %}
+                {% set p2 = raw_entities | select('match', '^switch[.]') | sort | list %}
+                {% set p3 = raw_entities | select('match', '^(button|input_boolean|scene|script)[.]') | sort | list %}
+                {% set base = p1 + p2 + p3 %}
                 {% if is_guest %}
-                  {{ base | select('in', guest_ents) | list | sort }}
-                {% else %}
-                  {{ base | sort }}
+                  {% set base = base | select('in', guest_ents) | list %}
                 {% endif %}
+                {% set ns = namespace(final=[], names=[]) %}
+                {% for ent in base %}
+                  {% set name = state_attr(ent, 'friendly_name') or ent.split('.')[1] %}
+                  {% if name not in ns.names %}
+                    {% set dev = device_id(ent) %}
+                    {% set keep = namespace(ok=true) %}
+                    {% if dev != none %}
+                      {% set ent_dom = ent.split('.')[0] %}
+                      {% for prev in ns.final %}
+                        {% if device_id(prev) == dev %}
+                          {% set prev_dom = prev.split('.')[0] %}
+                          {% set ent_pri = 1 if ent_dom in ['light', 'media_player', 'cover', 'fan', 'lock'] else (2 if ent_dom == 'switch' else 3) %}
+                          {% set prev_pri = 1 if prev_dom in ['light', 'media_player', 'cover', 'fan', 'lock'] else (2 if prev_dom in ['switch'] else 3) %}
+                          {% if prev_pri < ent_pri %}
+                            {% set keep.ok = false %}
+                          {% endif %}
+                        {% endif %}
+                      {% endfor %}
+                    {% endif %}
+                    {% if keep.ok %}
+                      {% set ns.final = ns.final + [ent] %}
+                      {% set ns.names = ns.names + [name] %}
+                    {% endif %}
+                  {% endif %}
+                {% endfor %}
+                {{ ns.final | to_json }}
           - if: "{{ list | length > 0 }}"
             then:
               - service: input_text.set_value
                 target: {entity_id: !input line_1}
-                data: {value: "{{ state_attr(list[(idx - 2) % list|length], 'friendly_name') if list|length > 2 else '' }}"}
+                data:
+                  value: >-
+                    {% if list|length >= 5 %}
+                      {% set item = list[(idx - 2) % list|length] %}
+                      {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
+                    {% else %}
+                      {% set target = idx - 2 %}
+                      {% if target >= 0 %}
+                        {% for item in list %}
+                          {%- if loop.index0 == target -%}
+                            {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
+                          {%- endif -%}
+                        {% endfor %}
+                      {% endif %}
+                    {% endif %}
               - service: input_text.set_value
                 target: {entity_id: !input line_2}
-                data: {value: "{{ state_attr(list[(idx - 1) % list|length], 'friendly_name') if list|length > 1 else '' }}"}
+                data:
+                  value: >-
+                    {% if list|length >= 5 %}
+                      {% set item = list[(idx - 1) % list|length] %}
+                      {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
+                    {% else %}
+                      {% set target = idx - 1 %}
+                      {% if target >= 0 %}
+                        {% for item in list %}
+                          {%- if loop.index0 == target -%}
+                            {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
+                          {%- endif -%}
+                        {% endfor %}
+                      {% endif %}
+                    {% endif %}
               - service: input_text.set_value
                 target: {entity_id: !input line_3}
-                data: {value: "{{ state_attr(list[idx % list|length], 'friendly_name') }}"}
+                data:
+                  value: >-
+                    {% if list|length >= 5 %}
+                      {% set item = list[idx % list|length] %}
+                      {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
+                    {% else %}
+                      {% for item in list %}
+                        {%- if loop.index0 == idx -%}
+                          {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
+                        {%- endif -%}
+                      {% endfor %}
+                    {% endif %}
               - service: input_text.set_value
                 target: {entity_id: !input line_3_status}
                 data:
                   value: >
                     {% set entity = list[idx % list|length] %}
-                    {% set dom = entity.split('.')[0] %}
-                    {% set ns = namespace(can_dim=false) %}
-                    {% if dom == 'light' %}
-                      {# Check for brightness support bit 0x01 (1) #}
-                      {% if (state_attr(entity, 'supported_features') | int(0) | bitwise_and(1)) > 0 %}
-                        {% set ns.can_dim = true %}
+                    {% if entity %}
+                      {% set dom = entity.split('.')[0] %}
+                      {% set ns = namespace(can_dim=false) %}
+                      {% if dom == 'light' %}
+                        {# Check for brightness support bit 0x01 (1) #}
+                        {% if (state_attr(entity, 'supported_features') | int(0) | bitwise_and(1)) > 0 %}
+                          {% set ns.can_dim = true %}
+                        {% endif %}
+                        {# Check unique color modes #}
+                        {% set modes = state_attr(entity, 'supported_color_modes') %}
+                        {% if modes %}
+                          {% for m in modes %}
+                            {% if m != 'onoff' %}
+                               {% set ns.can_dim = true %}
+                            {% endif %}
+                          {% endfor %}
+                        {% endif %}
+                      {% elif dom == 'media_player' %}
+                         {# Check for volume_set bit 0x04 (4) #}
+                         {% if (state_attr(entity, 'supported_features') | int(0) | bitwise_and(4)) > 0 %}
+                           {% set ns.can_dim = true %}
+                         {% endif %}
                       {% endif %}
-                      {# Check unique color modes #}
-                      {% set modes = state_attr(entity, 'supported_color_modes') %}
-                      {% if modes %}
-                        {% for m in modes %}
-                          {% if m != 'onoff' %}
-                             {% set ns.can_dim = true %}
-                          {% endif %}
-                        {% endfor %}
+                      {% set final_state = states(entity) %}
+                      {% if final_state == 'on' or final_state == 'playing' %}
+                         {% if dom == 'light' and ns.can_dim and state_attr(entity, 'brightness') != none %}
+                            {% set raw = (state_attr(entity, 'brightness') | int(0) / 2.55) %}
+                            {% set calc = (((raw / 10) | round(0, 'common')) * 10) | int %}
+                            {% set final_state = 'off' if calc <= 0 else (calc | string + '%') %}
+                         {% elif dom == 'media_player' and ns.can_dim and state_attr(entity, 'volume_level') != none %}
+                            {% set raw = (state_attr(entity, 'volume_level') | float(0) * 100) %}
+                            {% set calc = (((raw / 10) | round(0, 'common')) * 10) | int %}
+                            {% set final_state = 'off' if calc <= 0 else (calc | string + '%') %}
+                         {% endif %}
                       {% endif %}
-                    {% elif dom == 'media_player' %}
-                       {# Check for volume_set bit 0x04 (4) #}
-                       {% if (state_attr(entity, 'supported_features') | int(0) | bitwise_and(4)) > 0 %}
-                         {% set ns.can_dim = true %}
-                       {% endif %}
+                      ({{ final_state | truncate(12, True, '..') }}){{ ' *' if ns.can_dim else '' }}
                     {% endif %}
-                    {% set final_state = states(entity) %}
-                    {% if final_state == 'on' or final_state == 'playing' %}
-                       {% if dom == 'light' and ns.can_dim and state_attr(entity, 'brightness') != none %}
-                          {% set raw = (state_attr(entity, 'brightness') | int(0) / 2.55) %}
-                          {% set calc = (((raw / 10) | round(0, 'common')) * 10) | int %}
-                          {% set final_state = 'off' if calc <= 0 else (calc | string + '%') %}
-                       {% elif dom == 'media_player' and ns.can_dim and state_attr(entity, 'volume_level') != none %}
-                          {% set raw = (state_attr(entity, 'volume_level') | float(0) * 100) %}
-                          {% set calc = (((raw / 10) | round(0, 'common')) * 10) | int %}
-                          {% set final_state = 'off' if calc <= 0 else (calc | string + '%') %}
-                       {% endif %}
-                    {% endif %}
-                    ({{ final_state | truncate(12, True, '..') }}){{ ' *' if ns.can_dim else '' }}
               - service: input_text.set_value
                 target: {entity_id: !input line_4}
-                data: {value: "{{ state_attr(list[(idx + 1) % list|length], 'friendly_name') if list|length > 1 else '' }}"}
+                data:
+                  value: >-
+                    {% if list|length >= 5 %}
+                      {% set item = list[(idx + 1) % list|length] %}
+                      {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
+                    {% else %}
+                      {% set target = idx + 1 %}
+                      {% for item in list %}
+                        {%- if loop.index0 == target -%}
+                          {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
+                        {%- endif -%}
+                      {% endfor %}
+                    {% endif %}
               - service: input_text.set_value
                 target: {entity_id: !input line_5}
-                data: {value: "{{ state_attr(list[(idx + 2) % list|length], 'friendly_name') if list|length > 2 else '' }}"}
+                data:
+                  value: >-
+                    {% if list|length >= 5 %}
+                      {% set item = list[(idx + 2) % list|length] %}
+                      {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
+                    {% else %}
+                      {% set target = idx + 2 %}
+                      {% for item in list %}
+                        {%- if loop.index0 == target -%}
+                          {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
+                        {%- endif -%}
+                      {% endfor %}
+                    {% endif %}
             else:
+               - service: input_text.set_value
+                 target: {entity_id: !input line_1}
+                 data: {value: ""}
+               - service: input_text.set_value
+                 target: {entity_id: !input line_2}
+                 data: {value: ""}
                - service: input_text.set_value
                  target: {entity_id: !input line_3}
                  data: {value: "Empty Room"}
+               - service: input_text.set_value
+                 target: {entity_id: !input line_3_status}
+                 data: {value: ""}
+               - service: input_text.set_value
+                 target: {entity_id: !input line_4}
+                 data: {value: ""}
+               - service: input_text.set_value
+                 target: {entity_id: !input line_5}
+                 data: {value: ""}
 
