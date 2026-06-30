@@ -64,8 +64,6 @@ HARem is optimized for maximum battery performance:
 
 ---
 
-## [v0.6.3] - 2026-04-12
-
 ### Pin Mapping Table
 | Component | ESP32-C3 Pin | Type | Notes |
 | :--- | :--- | :--- | :--- |

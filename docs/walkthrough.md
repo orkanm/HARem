@@ -83,6 +83,10 @@ If the remote cannot connect to any configured WiFi network (e.g., you changed y
 - **Display**: Selection highlight moved to `x=8` to ensure pixel-perfect corners and zero interference with the scrollbar.
 - **Versioning**: Centralized version management via `substitutions` block.
 
+### 9. Final Verification (v0.7.1)
+- **Linear Scrolling**: Verified that short menus correctly clamp at boundaries, avoiding duplicate wrapped items.
+- **Dimming Status Evaluation**: Verified that dimming capabilities are correctly detected when the entity does not have a `friendly_name` attribute set.
+
 ## 5. Next Steps
 - [ ] Mount hardware in final enclosure.
 - [ ] 3D Print case (files not included in this repo).
@@ -93,21 +97,23 @@ If the remote cannot connect to any configured WiFi network (e.g., you changed y
 ### 1. Home Assistant Helpers (Pick 1 of 2 Methods)
 
 #### ✅ Option A: Drop-in Package (Professional)
-The fastest method. Creates all 8 required helpers.
+The fastest method. Creates all 11 required helpers.
 1. Copy [harem_package.yaml](file:///home/orquitto/Workspace/HARem/home_assistant/harem_package.yaml) to your Home Assistant `/config/packages/` folder.
 2. In `configuration.yaml`, ensure you have: `homeassistant: { packages: !include_dir_named packages }`.
 3. Restart Home Assistant. **Done.**
 
 #### 🛠 Option B: Manual Configuration
-Create these 8 Helpers manually in **Settings > Helpers**:
+Create these 11 Helpers manually in **Settings > Helpers**:
 
 | Helper Entity ID | Type | Purpose |
 | :--- | :--- | :--- |
 | `input_text.harem_menu_path` | Text | Tracks current location (`ROOT` or Area Name). |
 | `input_number.harem_menu_index` | Number | Tracks scroll position (0-1000). |
+| `input_number.harem_menu_total` | Number | Tracks total number of items in the list. |
 | `input_text.harem_line_1` | Text | Display Line 1 content. |
 | `input_text.harem_line_2` | Text | Display Line 2 content. |
 | `input_text.harem_line_3` | Text | Display Line 3 content (Selected). |
+| `input_text.harem_line_3_status` | Text | Display Line 3 state (e.g. `(on) *`). |
 | `input_text.harem_line_4` | Text | Display Line 4 content. |
 | `input_text.harem_line_5` | Text | Display Line 5 content. |
 | `input_text.harem_overlay` | Text | Feedback Screen Message (Pop-up). |
