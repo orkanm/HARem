@@ -75,16 +75,16 @@ HARem is optimized for maximum battery performance:
 ### 🛠️ PCB Design
 The HARem PCB is designed to be compact and easy to assemble, housing the ESP32-C3, OLED, and Rotary Encoder in a single unit.
 
-![HARem PCB Render](PCB/HArem/HArem_PCB.png)
+![HARem PCB Render](PCB/HARem/HArem_PCB.png)
 
 #### Interactive Visualizers
-*   **[Interactive 3D Viewer](https://3dviewer.net/index.html#model=https://raw.githubusercontent.com/orkanm/HARem/main/PCB/HArem/HArem.step)**: Examine the 3D model directly in your browser (STEP format).
-*   **[Interactive Schematic](https://kicanvas.org/?github=https://github.com/orkanm/HARem/blob/main/PCB/HArem/HArem.kicad_sch)**: Explore the electrical design with KiCanvas.
-*   **[Interactive PCB Layout](https://kicanvas.org/?github=https://github.com/orkanm/HARem/blob/main/PCB/HArem/HArem.kicad_pcb)**: Inspect the physical board routing and components.
+*   **[Interactive 3D Viewer](https://3dviewer.net/index.html#model=https://raw.githubusercontent.com/orkanm/HARem/main/PCB/HARem/HArem.step)**: Examine the 3D model directly in your browser (STEP format).
+*   **[Interactive Schematic](https://kicanvas.org/?github=https://github.com/orkanm/HARem/blob/main/PCB/HARem/HArem.kicad_sch)**: Explore the electrical design with KiCanvas.
+*   **[Interactive PCB Layout](https://kicanvas.org/?github=https://github.com/orkanm/HARem/blob/main/PCB/HARem/HArem.kicad_pcb)**: Inspect the physical board routing and components.
 
 #### Design Files
-*   **[KiCad Project](PCB/HArem/)**: Source files for schematic and board layout.
-*   **[PCB 3D Model (STEP)](PCB/HArem/HArem.step)**: Industrial standard 3D file for enclosure design.
+*   **[KiCad Project](PCB/HARem/)**: Source files for schematic and board layout.
+*   **[PCB 3D Model (STEP)](PCB/HARem/HArem.step)**: Industrial standard 3D file for enclosure design.
 
 ### 🖨️ 3D Printed Case
 The repository now includes a fully designed 3D printable case for the HARem remote, designed in FreeCAD.
