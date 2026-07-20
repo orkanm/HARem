@@ -89,7 +89,7 @@ If the remote cannot connect to any configured WiFi network (e.g., you changed y
 
 ## 5. Next Steps
 - [ ] Mount hardware in final enclosure.
-- [ ] 3D Print case (files not included in this repo).
+- [ ] 3D Print case (files are available in the Case/ directory).
 - [ ] Enjoy!
 
 ## Setup Guide

@@ -84,7 +84,12 @@ The HARem PCB is designed to be compact and easy to assemble, housing the ESP32-
 
 #### Design Files
 *   **[KiCad Project](PCB/HArem/)**: Source files for schematic and board layout.
-*   **[3D Model (STEP)](PCB/HArem/HArem.step)**: Industrial standard 3D file for enclosure design.
+*   **[PCB 3D Model (STEP)](PCB/HArem/HArem.step)**: Industrial standard 3D file for enclosure design.
+
+### 🖨️ 3D Printed Case
+The repository now includes a fully designed 3D printable case for the HARem remote, designed in FreeCAD.
+
+*   **[Case Files](Case/)**: Contains the source FreeCAD project (`.FCStd`), print-ready `.stl` files for the case, lid, and knob, along with a high-resolution `.step` model.
 
 ## 🚀 Quick Start
 1.  **Hardware**: ESP32-C3 + 1.3" SH1106 OLED + Rotary Encoder.
