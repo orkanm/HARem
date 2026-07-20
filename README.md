@@ -104,6 +104,7 @@ Explore the design files directly in your browser:
 
 ## 📖 Documentation & Development
 
+* **[Behavior & Interaction Map](docs/behavior_map.md)**: Visual state machines and logic flows for the device interaction.
 * **[Project Walkthrough](docs/walkthrough.md)**: Architecture, features, and troubleshooting.
 * **[Home Assistant Setup Guide](docs/generic_menu_setup.md)**: How to configure the Home Assistant side.
 * **[Environment Installation & Setup Guide](docs/installation.md)**: Guide for setting up your local Python environment and secrets.
