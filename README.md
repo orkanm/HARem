@@ -47,7 +47,7 @@ Building your own HARem is straightforward. The project includes custom PCB file
 ### Interactive Visualizers
 Explore the design files directly in your browser:
 * **[Interactive PCB 3D Viewer](https://3dviewer.net/index.html#model=https://raw.githubusercontent.com/orkanm/HARem/main/PCB/HARem/HArem.step)** (STEP format)
-* **[Interactive Case 3D Viewer](https://3dviewer.net/index.html#model=https://raw.githubusercontent.com/orkanm/HARem/main/Case/HARem_Case_2.0.step)** (STEP format)
+* **[Interactive Case 3D Viewer](https://3dviewer.net/index.html#model=https://raw.githubusercontent.com/orkanm/HARem/main/Case/HARem_Case_2.0-Case.stl,https://raw.githubusercontent.com/orkanm/HARem/main/Case/HARem_Case_2.0-Lid.stl,https://raw.githubusercontent.com/orkanm/HARem/main/Case/Encoder_Knob.stl)** (STL format)
 * **[Interactive Schematic](https://kicanvas.org/?github=https://github.com/orkanm/HARem/blob/main/PCB/HARem/HArem.kicad_sch)**
 * **[Interactive PCB Layout](https://kicanvas.org/?github=https://github.com/orkanm/HARem/blob/main/PCB/HARem/HArem.kicad_pcb)**
 
