@@ -89,6 +89,16 @@ The HARem PCB is designed to be compact and easy to assemble, housing the ESP32-
 ### 🖨️ 3D Printed Case
 The repository now includes a fully designed 3D printable case for the HARem remote, designed in FreeCAD.
 
+<p align="center">
+  <img src="Case/HARem-1.png" width="32%" />
+  <img src="Case/HARem-2.png" width="32%" />
+  <img src="Case/HARem-3.png" width="32%" />
+</p>
+
+#### Interactive Visualizer
+*   **[Interactive 3D Case Viewer](https://3dviewer.net/index.html#model=https://raw.githubusercontent.com/orkanm/HARem/main/Case/HARem_Case_2.0.step)**: Examine the 3D case model directly in your browser (STEP format).
+
+#### Case Files
 *   **[Case Files](Case/)**: Contains the source FreeCAD project (`.FCStd`), print-ready `.stl` files for the case, lid, and knob, along with a high-resolution `.step` model.
 
 ## 🚀 Quick Start
