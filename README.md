@@ -44,22 +44,34 @@ HARem is optimized for maximum battery performance:
 
 ### Wiring Diagram (ASCII)
 ```text
-       ESP32-C3 Super Mini             Peripherals
-    ┌───────────────────────┐        ┌───────────────┐
-    │          5V / 3.3V [VCC]──────▶[VCC]  OLED     │
-    │                GND [GND]──────▶[GND] (SSD1306) │
-    │         GPIO5 (SDA)[SDA]──────▶[SDA]           │
-    │         GPIO6 (SCL)[SCL]──────▶[SCL]           │
-    │                       │        └───────────────┘
-    │                       │        ┌───────────────┐
-    │     GPIO8 (CLK)[CLK]◀─┼────────[CLK]  ROTARY   │
-    │      GPIO9 (DT)[DT]◀──┼────────[DT]   ENCODER  │
-    │    GPIO4 (SW)[Wake]◀──┼────────[SW]   (EC11)   │
-    │                GND ◀──┼────────[GND]           │
-    │                       │        └───────────────┘
-    │   GPIO0 (ADC) [BAT] ◀─┬──[1M]──[+] BAT / +5V  │
-    │                      [1M]                     │
-    └───────────────────────┴────────▶ GND          │
+       ESP32-C3 Super Mini                 Peripherals
+    ┌───────────────────────┐            ┌───────────────┐
+    │                       │   Q1(NPN)  │ 1.3" OLED     │
+    │          5V / 3.3V ───┼────▶[C]    │               │
+    │  GPIO1 (OLED PWR) ────┼────▶[B]    │               │
+    │                       │     [E]────┼─▶ [VCC]       │
+    │                GND ───┼────────────┼─▶ [GND]       │
+    │         GPIO5 (SDA)───┼────────────┼─▶ [SDA]       │
+    │         GPIO6 (SCL)───┼────────────┼─▶ [SCL]       │
+    │                       │            └───────────────┘
+    │                       │            
+    │                       │            ┌───────────────┐
+    │                       │            │ ROTARY (EC11) │
+    │         GPIO8 (CLK) ◀─┼───[100Ω]───┼─ [CLK]        │
+    │          GPIO9 (DT) ◀─┼───[100Ω]───┼─ [DT]         │
+    │          GPIO4 (SW) ◀─┼───[100Ω]───┼─ [SW]         │
+    │                GND  ◀─┼────────────┼─ [GND]        │
+    │                       │            └───────────────┘
+    │                       │            ┌───────────────┐
+    │                       │            │ BAT MONITOR   │
+    │                       │            │  [+] BATTERY  │
+    │                       │            │   │           │
+    │                       │            │  [1MΩ]        │
+    │         GPIO0 (ADC) ◀─┼────────────┼───┤           │
+    │                       │            │  [1MΩ] [0.1µF]│
+    │                       │            │   │      │    │
+    │                GND  ◀─┼────────────┼──GND────GND   │
+    └───────────────────────┘            └───────────────┘
 ```
 
 ---
@@ -67,10 +79,11 @@ HARem is optimized for maximum battery performance:
 ### Pin Mapping Table
 | Component | ESP32-C3 Pin | Type | Notes |
 | :--- | :--- | :--- | :--- |
+| **OLED VCC** | GPIO1 | Output | Active Power Management (via Q1 NPN) |
 | **OLED SDA/SCL** | GPIO5 / GPIO6 | I2C | SSD1306/SH1106 |
 | **Encoder CLK/DT** | GPIO8 / GPIO9 | Input | Navigation |
 | **Encoder SW** | GPIO4 | Input | Wakeup Trigger |
-| **Battery ADC** | GPIO0 | Analog | 1M/1M Divider |
+| **Battery ADC** | GPIO0 | Analog | 1M/1M Divider + 0.1µF Cap |
 
 ### 🛠️ PCB Design
 The HARem PCB is designed to be compact and easy to assemble, housing the ESP32-C3, OLED, and Rotary Encoder in a single unit.
