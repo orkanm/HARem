@@ -78,7 +78,8 @@ The HARem PCB is designed to be compact and easy to assemble, housing the ESP32-
 ![HARem PCB Render](PCB/HARem/HArem_PCB.png)
 
 #### Interactive Visualizers
-*   **[Interactive 3D Viewer](https://3dviewer.net/index.html#model=https://raw.githubusercontent.com/orkanm/HARem/main/PCB/HARem/HArem.step)**: Examine the 3D model directly in your browser (STEP format).
+*   **[Interactive PCB 3D Viewer](https://3dviewer.net/index.html#model=https://raw.githubusercontent.com/orkanm/HARem/main/PCB/HARem/HArem.step)**: Examine the PCB 3D model directly in your browser (STEP format).
+*   **[Interactive Case 3D Viewer](https://3dviewer.net/index.html#model=https://raw.githubusercontent.com/orkanm/HARem/main/Case/HARem_Case_2.0.step)**: Examine the 3D case model directly in your browser (STEP format).
 *   **[Interactive Schematic](https://kicanvas.org/?github=https://github.com/orkanm/HARem/blob/main/PCB/HARem/HArem.kicad_sch)**: Explore the electrical design with KiCanvas.
 *   **[Interactive PCB Layout](https://kicanvas.org/?github=https://github.com/orkanm/HARem/blob/main/PCB/HARem/HArem.kicad_pcb)**: Inspect the physical board routing and components.
 
@@ -94,9 +95,6 @@ The repository now includes a fully designed 3D printable case for the HARem rem
   <img src="Case/HARem-2.png" width="32%" />
   <img src="Case/HARem-3.png" width="32%" />
 </p>
-
-#### Interactive Visualizer
-*   **[Interactive 3D Case Viewer](https://3dviewer.net/index.html#model=https://raw.githubusercontent.com/orkanm/HARem/main/Case/HARem_Case_2.0.step)**: Examine the 3D case model directly in your browser (STEP format).
 
 #### Case Files
 *   **[Case Files](Case/)**: Contains the source FreeCAD project (`.FCStd`), print-ready `.stl` files for the case, lid, and knob, along with a high-resolution `.step` model.
