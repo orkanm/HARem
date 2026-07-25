@@ -19,6 +19,7 @@ Unlike traditional smart remotes that require manual configuration of every butt
 - **Zero Maintenance**: Rooms, devices, and states are streamed in real-time. New devices added to a Home Assistant Area automatically appear on the remote.
 - **Modern UI**: A 5-line **1.3" OLED** interface featuring Outfit and Montserrat typography, a vertical scrollbar, and hardware-accelerated dynamic marquee for long names.
 - **Smart Power**: Deep sleep optimized for sub-1mA idle consumption, utilizing a high-impedance (1MΩ/1MΩ) battery divider and active OLED power management.
+- **Press & Twist Bulk Control**: Bulk power control (turn ON/OFF all designated room devices) directly from the room selection menu using Press & Twist gestures with an on-screen confirmation prompt (`Turn ON Room?` / `Turn OFF Room?`).
 - **Guest Mode Protection**: Secure, PIN-protected "Guest Mode" to restrict access to specific areas or devices.
 - **Visual Feedback & Control**: Interactive animations, sleep countdowns, and a local on-device menu for contrast and standby settings.
 

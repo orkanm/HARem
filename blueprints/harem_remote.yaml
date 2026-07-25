@@ -71,6 +71,14 @@ blueprint:
       selector:
         entity:
           multiple: true
+    bulk_included_entities:
+      name: "[Bulk Control] Included Entities"
+      description: "Select ALL entities that should be affected by bulk room power control (press and twist on a room in ROOT menu)."
+      default: []
+      selector:
+        entity:
+          multiple: true
+
   
 
 mode: restart
@@ -89,6 +97,7 @@ action:
       idx: "{{ states(idx_entity) | int }}"
       guest_switch_entity: !input guest_mode_switch
       guest_ents_raw: !input guest_included_entities
+      bulk_ents_raw: !input bulk_included_entities
       
   - variables:
       guest_ents: >
@@ -96,6 +105,12 @@ action:
           {{ [guest_ents_raw] }}
         {% else %}
           {{ guest_ents_raw }}
+        {% endif %}
+      bulk_ents: >
+        {% if bulk_ents_raw is string %}
+          {{ [bulk_ents_raw] }}
+        {% else %}
+          {{ bulk_ents_raw }}
         {% endif %}
       list_size: >
         {% set gm = guest_switch_entity %}
@@ -206,12 +221,14 @@ action:
             data: {value: ""}
           # The automation will now continue to the "UPDATE DISPLAY" section below
 
-      # CLICK -> Enter/Toggle
+      # CLICK -> Enter/Toggle or Confirm Bulk Action
       - conditions: "{{ action == 'click' and list_size > 0 }}"
         sequence:
           - if: "{{ path == 'ROOT' or path == '' }}"
             then:
               - variables:
+                  ov_entity: !input overlay
+                  current_ov: "{{ states(ov_entity) }}"
                   gm: "{{ guest_switch_entity }}"
                   is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
                   areas_list: >
@@ -227,13 +244,72 @@ action:
                     {% else %}
                        {{ areas() | sort | to_json }}
                     {% endif %}
-                  selected_area: "{{ areas_list[idx % areas_list | length] }}"
-              - service: input_text.set_value
-                target: {entity_id: !input menu_path}
-                data: {value: "{{ selected_area }}"}
-              - service: input_number.set_value
-                target: {entity_id: !input menu_index}
-                data: {value: 0}
+                  selected_area: "{{ areas_list[idx % areas_list | length] if (areas_list is defined and areas_list | length > 0) else '' }}"
+                  selected_area_name: "{{ area_name(selected_area) or selected_area }}"
+                  raw_area_ents: "{{ area_entities(selected_area) | reject('is_hidden_entity') | list if selected_area != '' else [] }}"
+                  target_bulk_ents: >
+                    {% set allowed = raw_area_ents | select('in', bulk_ents) | list %}
+                    {% if is_guest %}
+                      {% set allowed = allowed | select('in', guest_ents) | list %}
+                    {% endif %}
+                    {{ allowed | join(',') }}
+
+              - choose:
+                  # CONFIRM BULK TURN ON
+                  - conditions: "{{ current_ov == 'Turn ON Room?' }}"
+                    sequence:
+                      - choose:
+                          - conditions: "{{ target_bulk_ents != '' }}"
+                            sequence:
+                              - service: input_text.set_value
+                                target: {entity_id: !input overlay}
+                                data: {value: "{{ selected_area_name }} ON"}
+                              - service: homeassistant.turn_on
+                                target: {entity_id: "{{ target_bulk_ents.split(',') }}"}
+                                continue_on_error: true
+                        default:
+                          - service: input_text.set_value
+                            target: {entity_id: !input overlay}
+                            data: {value: "No Bulk Devices"}
+                      - delay: "00:00:01.5"
+                      - service: input_text.set_value
+                        target: {entity_id: !input overlay}
+                        data: {value: ""}
+                      - service: input_text.set_value
+                        target: {entity_id: !input line_5}
+                        data: {value: ""}
+
+                  # CONFIRM BULK TURN OFF
+                  - conditions: "{{ current_ov == 'Turn OFF Room?' }}"
+                    sequence:
+                      - choose:
+                          - conditions: "{{ target_bulk_ents != '' }}"
+                            sequence:
+                              - service: input_text.set_value
+                                target: {entity_id: !input overlay}
+                                data: {value: "{{ selected_area_name }} OFF"}
+                              - service: homeassistant.turn_off
+                                target: {entity_id: "{{ target_bulk_ents.split(',') }}"}
+                                continue_on_error: true
+                        default:
+                          - service: input_text.set_value
+                            target: {entity_id: !input overlay}
+                            data: {value: "No Bulk Devices"}
+                      - delay: "00:00:01.5"
+                      - service: input_text.set_value
+                        target: {entity_id: !input overlay}
+                        data: {value: ""}
+                      - service: input_text.set_value
+                        target: {entity_id: !input line_5}
+                        data: {value: ""}
+
+                default:
+                  - service: input_text.set_value
+                    target: {entity_id: !input menu_path}
+                    data: {value: "{{ selected_area }}"}
+                  - service: input_number.set_value
+                    target: {entity_id: !input menu_index}
+                    data: {value: 0}
             else:
               - variables:
                   gm: "{{ guest_switch_entity }}"
@@ -319,6 +395,60 @@ action:
                 data: {value: ""}
               - service: input_text.set_value
                 target: {entity_id: !input line_5}
+                data: {value: ""}
+
+      # ROTATE HOLD ON ROOM -> Ask Confirmation for Bulk Room Power Control
+      - conditions: "{{ (action == 'rotate_cw_hold' or action == 'rotate_ccw_hold') and (path == 'ROOT' or path == '') }}"
+        sequence:
+          - variables:
+              gm: "{{ guest_switch_entity }}"
+              is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
+              areas_list: >
+                {% if is_guest %}
+                   {% set ns = namespace(areas=[]) %}
+                   {% for ent in guest_ents %}
+                     {% set a = area_id(ent) %}
+                     {% if a != none and a not in ns.areas %}
+                       {% set ns.areas = ns.areas + [a] %}
+                     {% endif %}
+                   {% endfor %}
+                   {{ ns.areas | sort | to_json }}
+                {% else %}
+                   {{ areas() | sort | to_json }}
+                {% endif %}
+              target_area: "{{ areas_list[idx % areas_list | length] if (areas_list is defined and areas_list | length > 0) else '' }}"
+              raw_area_ents: "{{ area_entities(target_area) | reject('is_hidden_entity') | list if target_area != '' else [] }}"
+              target_bulk_ents: >
+                {% set allowed = raw_area_ents | select('in', bulk_ents) | list %}
+                {% if is_guest %}
+                  {% set allowed = allowed | select('in', guest_ents) | list %}
+                {% endif %}
+                {{ allowed | join(',') }}
+              is_on: "{{ action == 'rotate_cw_hold' }}"
+              ov_entity: !input overlay
+
+          - choose:
+              - conditions: "{{ target_bulk_ents != '' }}"
+                sequence:
+                  - service: input_text.set_value
+                    target: {entity_id: !input overlay}
+                    data:
+                      value: >-
+                        {% if is_on %}Turn ON Room?{% else %}Turn OFF Room?{% endif %}
+                  - delay: "00:00:04"
+                  - if: "{{ is_state(ov_entity, 'Turn ON Room?') or is_state(ov_entity, 'Turn OFF Room?') }}"
+                    then:
+                      - service: input_text.set_value
+                        target: {entity_id: !input overlay}
+                        data: {value: ""}
+            default:
+              - service: input_text.set_value
+                target: {entity_id: !input overlay}
+                data:
+                  value: "No Bulk Devices"
+              - delay: "00:00:01.5"
+              - service: input_text.set_value
+                target: {entity_id: !input overlay}
                 data: {value: ""}
 
       # ROTATE HOLD -> Brightness / Volume Control
@@ -547,7 +677,7 @@ action:
                     {% endif %}
               - service: input_text.set_value
                 target: {entity_id: !input line_3_status}
-                data: {value: ""}
+                data: {value: "(room) *"}
               - service: input_text.set_value
                 target: {entity_id: !input line_4}
                 data:

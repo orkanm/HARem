@@ -42,12 +42,18 @@ All menu logic, dimming control, and screen updates are securely handled by the 
 2. Go to **Settings > Automations & Scenes > Blueprints** and find "HARem: Universal ESPHome Remote Controller".
 3. Click **Create Automation**.
 4. Use the dropdowns to select the Helpers you created in Step 1.
-5. Click **Save**.
-```
+5. Select the entities under **[Bulk Control] Included Entities** that should be affected by room bulk power control (e.g. lights, switches; unselected devices like fridges will remain untouched).
+6. Click **Save**.
+
+---
 
 ## How to use
-1.  **Start**: Ensure `input_text.harem_menu_path` is set to `ROOT`.
-2.  **Navigate**: Rotate to scroll through Rooms.
-3.  **Enter**: Click to enter a Room (lists devices in that Area).
-4.  **Control**: Click to toggle a device.
-5.  **Exit**: Long Press (>0.3s) the knob to go back to the Room list.
+1. **Start**: Ensure `input_text.harem_menu_path` is set to `ROOT`.
+2. **Navigate**: Rotate to scroll through Rooms.
+3. **Bulk Control**: While highlighting a Room in the Room list:
+   - **Press & Twist Clockwise**: Displays `Turn ON Room?` -> **Click knob to confirm** turning ON all allowed devices in that room.
+   - **Press & Twist Counter-Clockwise**: Displays `Turn OFF Room?` -> **Click knob to confirm** turning OFF all allowed devices in that room.
+   - *(Rotating away or waiting 4s automatically cancels the prompt without making changes)*
+4. **Enter**: Click knob on a room when no prompt is showing to enter the Room (lists devices in that Area).
+5. **Control**: Click to toggle a device. Hold & Rotate to adjust brightness / volume.
+6. **Exit**: Long Press (>0.8s) the knob to go back to the Room list.
