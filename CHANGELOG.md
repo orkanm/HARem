@@ -2,7 +2,7 @@
 
 All notable changes to the HARem project will be documented in this file.
 
-## [v0.7.1] - 2026-06-30
+## [v0.7.2] - 2026-07-31
 
 ### Fixed
 - **Linear Scrolling**: Fixed a bug where short menus (fewer than 5 items) padded the display with empty lines that wrapped improperly, causing blank gaps. Changed the logic to clamp list elements in short menus while retaining infinite circular scrolling for larger ones.

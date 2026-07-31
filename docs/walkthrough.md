@@ -87,6 +87,10 @@ If the remote cannot connect to any configured WiFi network (e.g., you changed y
 - **Linear Scrolling**: Verified that short menus correctly clamp at boundaries, avoiding duplicate wrapped items.
 - **Dimming Status Evaluation**: Verified that dimming capabilities are correctly detected when the entity does not have a `friendly_name` attribute set.
 
+### 10. Final Verification (v0.7.2)
+- **Overlay Dismissal & Timeout**: Verified 5-second inactivity timeout and long-press BACK button overlay dismissal across bulk room power and individual device dimming modes.
+- **Line 5 Sync**: Verified synchronized 5-line rendering upon returning from overlays.
+
 ## 5. Next Steps
 - [ ] Mount hardware in final enclosure.
 - [ ] 3D Print case (files are available in the Case/ directory).
