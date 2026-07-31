@@ -233,6 +233,37 @@ globals:
     type: int
     restore_value: yes
     initial_value: '1'
+  - id: demo_mode
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
+  - id: demo_path
+    type: int
+    initial_value: '0'
+  - id: demo_index
+    type: int
+    initial_value: '0'
+  - id: demo_overlay
+    type: std::string
+    initial_value: '""'
+  - id: demo_overlay_time
+    type: uint32_t
+    initial_value: '0'
+  - id: demo_light1_pct
+    type: int
+    initial_value: '80'
+  - id: demo_speaker_pct
+    type: int
+    initial_value: '50'
+  - id: demo_lamp_on
+    type: bool
+    initial_value: 'true'
+  - id: demo_fan_on
+    type: bool
+    initial_value: 'false'
+  - id: demo_lock_state
+    type: bool
+    initial_value: 'true'
   - id: battery_percent
     type: float
     restore_value: yes
@@ -404,10 +435,15 @@ binary_sensor:
                   return;
                }
 
-               if (id(settings_index) == 9) { // Exit
+               if (id(settings_index) == 10) { // Exit
                  id(settings_mode) = false;
                  id(edit_mode) = false;
                  id(my_display).update();
+               } else if (id(settings_index) == 9) { // Demo Mode Toggle
+                  id(demo_mode) = !id(demo_mode);
+                  id(local_overlay_msg) = id(demo_mode) ? "Demo Mode: ON" : "Demo Mode: OFF";
+                  id(show_local_warning)->execute();
+                  id(my_display).update();
                } else if (id(settings_index) == 7) { // WiFi (Rescan Trigger)
                   id(settings_mode) = false;
                   id(my_display).update();
@@ -438,7 +474,47 @@ binary_sensor:
                }
             } else {
                if (id(is_awake)) {
-                 id(send_click_event)->execute();
+                 if (id(demo_mode)) {
+                    id(idle_timer)->execute();
+                    if (id(demo_overlay) != "") {
+                        if (id(demo_overlay) == "Turn ON Room?") {
+                            std::string r_name = (id(demo_index) == 0) ? "Living Room" : (id(demo_index) == 1 ? "Bedroom" : (id(demo_index) == 2 ? "Kitchen" : "Office"));
+                            id(demo_overlay) = r_name + " ON";
+                            id(demo_overlay_time) = millis();
+                        } else if (id(demo_overlay) == "Turn OFF Room?") {
+                            std::string r_name = (id(demo_index) == 0) ? "Living Room" : (id(demo_index) == 1 ? "Bedroom" : (id(demo_index) == 2 ? "Kitchen" : "Office"));
+                            id(demo_overlay) = r_name + " OFF";
+                            id(demo_overlay_time) = millis();
+                        } else {
+                            id(demo_overlay) = "";
+                        }
+                    } else {
+                        if (id(demo_path) == 0) {
+                            id(demo_path) = id(demo_index) + 1;
+                            id(demo_index) = 0;
+                        } else if (id(demo_path) == 1) { // Living Room
+                            if (id(demo_index) == 2) {
+                                id(demo_lamp_on) = !id(demo_lamp_on);
+                                id(demo_overlay) = id(demo_lamp_on) ? "Turning On..." : "Turning Off...";
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 3) {
+                                id(demo_fan_on) = !id(demo_fan_on);
+                                id(demo_overlay) = id(demo_fan_on) ? "Turning On..." : "Turning Off...";
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 4) {
+                                id(demo_lock_state) = !id(demo_lock_state);
+                                id(demo_overlay) = id(demo_lock_state) ? "Locking..." : "Unlocking...";
+                                id(demo_overlay_time) = millis();
+                            }
+                        } else if (id(demo_path) >= 2 && id(demo_path) <= 4) {
+                            id(demo_overlay) = "Toggled !";
+                            id(demo_overlay_time) = millis();
+                        }
+                    }
+                    id(my_display).update();
+                 } else {
+                    id(send_click_event)->execute();
+                 }
                } else {
                  id(idle_timer)->execute();
                }
@@ -454,9 +530,19 @@ binary_sensor:
                    id(settings_mode) = false;
                    id(edit_mode) = false;
                }
-            } else {
-               id(send_back_event)->execute();
-            }
+             } else {
+                if (id(demo_mode)) {
+                   if (id(demo_overlay) != "") {
+                       id(demo_overlay) = "";
+                   } else if (id(demo_path) != 0) {
+                       id(demo_path) = 0;
+                       id(demo_index) = 0;
+                   }
+                   id(my_display).update();
+                } else {
+                   id(send_back_event)->execute();
+                }
+             }
           }
 
 text_sensor:
@@ -510,6 +596,36 @@ sensor:
     on_clockwise:
       - script.execute: idle_timer
       - lambda: |-
+          if (id(demo_mode) && !id(settings_mode)) {
+             id(handle_settings_hold)->stop();
+             if (id(encoder_button).state) {
+                 id(processed_rotate_hold) = true;
+                 if (id(demo_path) == 0) {
+                     id(demo_overlay) = "Turn ON Room?";
+                     id(demo_overlay_time) = millis();
+                 } else if (id(demo_path) == 1) {
+                     if (id(demo_index) == 0) {
+                         id(demo_light1_pct) = std::min(100, id(demo_light1_pct) + 10);
+                         id(demo_overlay) = "Bright " + std::to_string(id(demo_light1_pct)) + "%";
+                         id(demo_overlay_time) = millis();
+                     } else if (id(demo_index) == 1) {
+                         id(demo_speaker_pct) = std::min(100, id(demo_speaker_pct) + 10);
+                         id(demo_overlay) = "Vol " + std::to_string(id(demo_speaker_pct)) + "%";
+                         id(demo_overlay_time) = millis();
+                     }
+                 }
+             } else {
+                 if (id(demo_overlay) == "Turn ON Room?" || id(demo_overlay) == "Turn OFF Room?") {
+                     id(demo_overlay) = (id(demo_overlay) == "Turn ON Room?") ? "Turn OFF Room?" : "Turn ON Room?";
+                     id(demo_overlay_time) = millis();
+                 } else {
+                     int total = (id(demo_path) == 0 || id(demo_path) == 1 || id(demo_path) == 5) ? 5 : 3;
+                     id(demo_index) = (id(demo_index) + 1) % total;
+                 }
+             }
+             id(my_display).update();
+             return;
+          }
           if (id(encoder_button).state) {
             // Check if status contains '*' (dimmable)
             std::string st = id(remote_line_3_status).state;
@@ -570,17 +686,17 @@ sensor:
                            }
                         } else if (id(settings_index) == 3) { // Animations
 
-                           id(enable_animations_v2) = (id(enable_animations_v2) == 1) ? 0 : 1;
+                            id(enable_animations_v2) = (id(enable_animations_v2) == 1) ? 0 : 1;
                            changed = true;
                         }
                         if (changed) id(my_display).update();
                  else:
-                   # Move Down (Wrapped)
-                   - lambda: |-
-                       // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:Guest, 5:LeftHand, 6:ChangePIN, 7:WiFi, 8:IP, 9:Exit
-                       id(settings_index)++;
-                       if (id(settings_index) > 9) id(settings_index) = 0;
-                       id(my_display).update();
+                    # Move Down (Wrapped)
+                    - lambda: |-
+                        // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:Guest, 5:LeftHand, 6:ChangePIN, 7:WiFi, 8:IP, 9:Demo, 10:Exit
+                        id(settings_index)++;
+                        if (id(settings_index) > 10) id(settings_index) = 0;
+                        id(my_display).update();
           else:
             - if:
                 condition:
@@ -594,6 +710,36 @@ sensor:
     on_anticlockwise:
       - script.execute: idle_timer
       - lambda: |-
+          if (id(demo_mode) && !id(settings_mode)) {
+             id(handle_settings_hold)->stop();
+             if (id(encoder_button).state) {
+                 id(processed_rotate_hold) = true;
+                 if (id(demo_path) == 0) {
+                     id(demo_overlay) = "Turn OFF Room?";
+                     id(demo_overlay_time) = millis();
+                 } else if (id(demo_path) == 1) {
+                     if (id(demo_index) == 0) {
+                         id(demo_light1_pct) = std::max(0, id(demo_light1_pct) - 10);
+                         id(demo_overlay) = "Bright " + std::to_string(id(demo_light1_pct)) + "%";
+                         id(demo_overlay_time) = millis();
+                     } else if (id(demo_index) == 1) {
+                         id(demo_speaker_pct) = std::max(0, id(demo_speaker_pct) - 10);
+                         id(demo_overlay) = "Vol " + std::to_string(id(demo_speaker_pct)) + "%";
+                         id(demo_overlay_time) = millis();
+                     }
+                 }
+             } else {
+                 if (id(demo_overlay) == "Turn ON Room?" || id(demo_overlay) == "Turn OFF Room?") {
+                     id(demo_overlay) = (id(demo_overlay) == "Turn ON Room?") ? "Turn OFF Room?" : "Turn ON Room?";
+                     id(demo_overlay_time) = millis();
+                 } else {
+                     int total = (id(demo_path) == 0 || id(demo_path) == 1 || id(demo_path) == 5) ? 5 : 3;
+                     id(demo_index) = (id(demo_index) - 1 + total) % total;
+                 }
+             }
+             id(my_display).update();
+             return;
+          }
           if (id(encoder_button).state) {
             // Check if status contains '*' (dimmable)
             std::string st = id(remote_line_3_status).state;
@@ -659,15 +805,15 @@ sensor:
                         }
                         if (changed) id(my_display).update();
                  else:
-                   # Move Up (Wrapped)
-                   - lambda: |-
-                       // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:Guest, 5:LeftHand, 6:ChangePIN, 7:WiFi, 8:IP, 9:Exit
-                       if (id(settings_index) == 0) {
-                           id(settings_index) = 9;
-                       } else {
-                           id(settings_index)--;
-                       }
-                       id(my_display).update();
+                    # Move Up (Wrapped)
+                    - lambda: |-
+                        // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:Guest, 5:LeftHand, 6:ChangePIN, 7:WiFi, 8:IP, 9:Demo, 10:Exit
+                        if (id(settings_index) == 0) {
+                            id(settings_index) = 10;
+                        } else {
+                            id(settings_index)--;
+                        }
+                        id(my_display).update();
           else:
             - if:
                 condition:
@@ -954,7 +1100,10 @@ display:
                   else
                      it.print(x_pos, draw_y, current_font, text_col, align, "IP: N/A");
               }
-              else if (current_item == 9) { // Exit
+              else if (current_item == 9) { // Demo Mode
+                  it.printf(x_pos, draw_y, current_font, text_col, align, "Demo: %s", id(demo_mode) ? "ON" : "OFF");
+              }
+              else if (current_item == 10) { // Exit
                   it.print(x_pos, draw_y, current_font, text_col, align, "Exit");
               }
           }
@@ -966,6 +1115,90 @@ display:
       else if (id(local_overlay_msg) != "") {
          it.fill(id(my_color_black));
          it.print(64, 32, id(font_header), TextAlign::CENTER, id(local_overlay_msg).c_str());
+      }
+
+      // 00E. STANDALONE DEMO MODE ENGINE
+      else if (id(demo_mode)) {
+          // Check 5-second inactivity timeout for demo overlay
+          if (id(demo_overlay) != "" && (millis() - id(demo_overlay_time) > 5000)) {
+              id(demo_overlay) = "";
+          }
+
+          if (id(demo_overlay) != "") {
+              it.fill(id(my_color_black));
+              it.print(64, 25, id(font_header), TextAlign::TOP_CENTER, id(demo_overlay).c_str());
+          } else {
+              struct DemoItem { std::string name; std::string status; };
+              std::vector<DemoItem> items;
+              int p = id(demo_path);
+              if (p == 0) { // ROOT
+                  items = {{"Living Room", "(room)"}, {"Bedroom", "(room)"}, {"Kitchen", "(room)"}, {"Office", "(room)"}, {"HARem Specs", ""}};
+              } else if (p == 1) { // Living Room
+                  items = {
+                      {"Ceiling Light", "(" + std::to_string(id(demo_light1_pct)) + "%) *"},
+                      {"TV Speaker", "(" + std::to_string(id(demo_speaker_pct)) + "%) *"},
+                      {"Floor Lamp", id(demo_lamp_on) ? "(on)" : "(off)"},
+                      {"Standing Fan", id(demo_fan_on) ? "(on)" : "(off)"},
+                      {"Front Door", id(demo_lock_state) ? "(locked)" : "(unlocked)"}
+                  };
+              } else if (p == 2) { // Bedroom
+                  items = {{"Nightstand Light", "(60%) *"}, {"Air Conditioner", "(off)"}, {"Bedside Audio", "(30%) *"}};
+              } else if (p == 3) { // Kitchen
+                  items = {{"Coffee Maker", "(off)"}, {"Counter Light", "(100%) *"}, {"Smart Kettle", "(off)"}};
+              } else if (p == 4) { // Office
+                  items = {{"Desk Lamp", "(50%) *"}, {"Monitor Lightbar", "(on) *"}, {"Workstation PC", "(on)"}};
+              } else { // HARem Specs
+                  items = {
+                      {"MCU: ESP32-C3 RISC-V", ""},
+                      {"Display: OLED 128x64", ""},
+                      {"Control: Rotary Encoder", ""},
+                      {"Power: LiPo + ADC Cal", ""},
+                      {"OS: ESPHome (ESP-IDF)", ""}
+                  };
+              }
+
+              int total = items.size();
+              int idx = id(demo_index) % total;
+
+              // Draw Top Header
+              it.print(6, 0, id(font_tiny), id(my_color_white), TextAlign::TOP_LEFT, "DEMO");
+              if (p == 5) {
+                  it.print(64, 0, id(font_small), id(my_color_white), TextAlign::TOP_CENTER, "HAREM SPECS");
+              } else {
+                  std::string p_name = (p == 0) ? "ROOT" : (p == 1 ? "Living Room" : (p == 2 ? "Bedroom" : (p == 3 ? "Kitchen" : "Office")));
+                  it.print(64, 0, id(font_tiny), id(my_color_white), TextAlign::TOP_CENTER, p_name.c_str());
+              }
+              it.printf(127, 0, id(font_tiny), id(my_color_white), TextAlign::TOP_RIGHT, "%.0f%%", id(battery_percent));
+
+              // Draw 5 Menu Lines
+              int y_coords[5] = {6, 17, 29, 44, 54};
+              for (int i = 0; i < 5; i++) {
+                  int item_i = (idx - 2 + i + total * 10) % total;
+                  if (total < 5 && (idx - 2 + i < 0 || idx - 2 + i >= total)) continue;
+                  
+                  if (i == 2) {
+                      // Selected Line 3
+                      std::string st = items[item_i].status;
+                      size_t star_pos = st.find(" *");
+                      if (star_pos != std::string::npos) st = st.substr(0, star_pos);
+                      
+                      it.print(10, 29, id(font_small), id(my_color_white), TextAlign::TOP_LEFT, items[item_i].name.c_str());
+                      if (st != "") {
+                          it.print(124, 29, id(font_small), id(my_color_white), TextAlign::TOP_RIGHT, st.c_str());
+                      }
+                  } else {
+                      it.print(10, y_coords[i], id(font_small), id(my_color_white), TextAlign::TOP_LEFT, items[item_i].name.c_str());
+                  }
+              }
+
+              // Draw Selection Outline around Line 3
+              it.rectangle(8, 28, 120, 14, id(my_color_white));
+
+              // Draw Scrollbar Thumb
+              int thumb_h = 10;
+              int thumb_y = (total > 1) ? (int)(((float)idx / (total - 1)) * (64 - thumb_h)) : 0;
+              it.filled_rectangle(0, thumb_y, 5, thumb_h, id(my_color_white));
+          }
       }
 
       else if (id(remote_overlay).has_state() && id(remote_overlay).state != "") {
@@ -1079,7 +1312,7 @@ display:
           // 4. Draw Scroll Thumb (Location Indicator)
           if (id(settings_mode)) {
               int thumb_h = 12;
-              int thumb_y = 15 + (id(settings_index) * (48 - thumb_h) / 9);
+              int thumb_y = 15 + (id(settings_index) * (48 - thumb_h) / 10);
               it.filled_rectangle(0, thumb_y, 5, thumb_h, id(my_color_white));
           } else {
               // Ensure we have a valid total, even if HA is slow to update
