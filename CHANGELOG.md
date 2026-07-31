@@ -2,11 +2,17 @@
 
 All notable changes to the HARem project will be documented in this file.
 
-## [v0.7.1] - 2026-06-30
+## [v0.7.2] - 2026-07-31
 
 ### Fixed
 - **Linear Scrolling**: Fixed a bug where short menus (fewer than 5 items) padded the display with empty lines that wrapped improperly, causing blank gaps. Changed the logic to clamp list elements in short menus while retaining infinite circular scrolling for larger ones.
 - **Dimming Status Evaluation**: Fixed an issue where the remote reported dimmable lights as "Not Supported !" because the entity was missing a `friendly_name` and the status template scoping prevented the dimming support asterisk (`*`) from rendering properly. Jinja loops scoping was simplified to directly fetch by modulus. Added a fallback to `object_id` when `friendly_name` is missing to prevent invisible elements.
+- **Overlay Click Passthrough**: Fixed an issue where pressing the button while an active feedback overlay (e.g., "Living Room ON", "Living Room OFF", "Turning Off...") was displayed caused the remote to navigate into the room menu and toggle a device inside that room. Button presses while an active feedback overlay is showing now cleanly dismiss the overlay without triggering menu navigation or entity state changes.
+- **Stale Status String Overwrite**: Fixed an issue where adjusting entity percentage (brightness/volume) caused the status string on the right of the entity to revert to an old value upon exiting control mode. The Blueprint now preserves the optimistic status string during `refresh` events and prevents active (`on`/`playing`) entities from falling back to `(off)` when Home Assistant attribute updates are delayed.
+- **Line 5 Rendering Lag**: Fixed a visual delay where Line 5 appeared slightly after Lines 1–4 when returning from overlay screens in room menus. Removed premature `line_5` clearing service calls during overlay dismissal so that ESPHome renders all 5 menu lines simultaneously.
+- **Bulk Room Power Timeout & Long Press Exit**: Extended bulk power confirmation prompt timeout to 5 seconds of inactivity and added support for long pressing the dial (`action: back`) on `ROOT` to immediately dismiss the prompt without executing the action.
+- **Device Dimming & Volume Overlay Timeout**: Added a 5-second inactivity timeout for individual device brightness and volume adjustments. When dial rotation ceases for 5 seconds (or upon click/long-press), the overlay automatically clears and ESPHome exits control mode.
+- **Long Press Overlay Dismissal in Rooms**: Fixed an issue where long pressing the dial (`action: back`) while an overlay was active inside a room menu incorrectly exited to `ROOT`. Long pressing while an overlay is active now only dismisses the overlay and keeps the user inside the current room menu.
 
 
 ## [v0.7.0] - 2026-05-02
