@@ -617,23 +617,35 @@ action:
             target: {entity_id: !input overlay}
             data: {value: ""}
 
-      # BACK -> Exit Room or Clear Active Overlay Prompt
+      # BACK -> Dismiss Active Overlay or Exit Room to ROOT
       - conditions: "{{ action == 'back' }}"
         sequence:
-          - service: input_text.set_value
-            target: {entity_id: !input overlay}
-            data: {value: ""}
-          - if: "{{ path != 'ROOT' and path != '' }}"
-            then:
-              - variables:
-                  sorted_areas: "{{ areas() | sort }}"
-                  restore_idx: "{{ sorted_areas.index(path) if path in sorted_areas else 0 }}"
-              - service: input_number.set_value
-                target: {entity_id: !input menu_index}
-                data: {value: "{{ restore_idx }}"}
+          - variables:
+              ov_entity: !input overlay
+              current_ov: "{{ states(ov_entity) }}"
+          - choose:
+              # 1. If overlay active, ONLY dismiss overlay (stay in current room/view)
+              - conditions: "{{ current_ov != '' and current_ov != ' ' }}"
+                sequence:
+                  - service: input_text.set_value
+                    target: {entity_id: !input overlay}
+                    data: {value: ""}
+            # 2. If NO overlay active, exit room to ROOT
+            default:
               - service: input_text.set_value
-                target: {entity_id: !input menu_path}
-                data: {value: "ROOT"}
+                target: {entity_id: !input overlay}
+                data: {value: ""}
+              - if: "{{ path != 'ROOT' and path != '' }}"
+                then:
+                  - variables:
+                      sorted_areas: "{{ areas() | sort }}"
+                      restore_idx: "{{ sorted_areas.index(path) if path in sorted_areas else 0 }}"
+                  - service: input_number.set_value
+                    target: {entity_id: !input menu_index}
+                    data: {value: "{{ restore_idx }}"}
+                  - service: input_text.set_value
+                    target: {entity_id: !input menu_path}
+                    data: {value: "ROOT"}
 
   # 2. UPDATE DISPLAY (skip for rotation — overlay is shown, line_5 is the pct tracker)
   - if: "{{ action not in ['rotate_cw_hold', 'rotate_ccw_hold'] }}"

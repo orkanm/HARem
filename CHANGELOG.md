@@ -12,6 +12,7 @@ All notable changes to the HARem project will be documented in this file.
 - **Line 5 Rendering Lag**: Fixed a visual delay where Line 5 appeared slightly after Lines 1–4 when returning from overlay screens in room menus. Removed premature `line_5` clearing service calls during overlay dismissal so that ESPHome renders all 5 menu lines simultaneously.
 - **Bulk Room Power Timeout & Long Press Exit**: Extended bulk power confirmation prompt timeout to 5 seconds of inactivity and added support for long pressing the dial (`action: back`) on `ROOT` to immediately dismiss the prompt without executing the action.
 - **Device Dimming & Volume Overlay Timeout**: Added a 5-second inactivity timeout for individual device brightness and volume adjustments. When dial rotation ceases for 5 seconds (or upon click/long-press), the overlay automatically clears and ESPHome exits control mode.
+- **Long Press Overlay Dismissal in Rooms**: Fixed an issue where long pressing the dial (`action: back`) while an overlay was active inside a room menu incorrectly exited to `ROOT`. Long pressing while an overlay is active now only dismisses the overlay and keeps the user inside the current room menu.
 
 
 ## [v0.7.0] - 2026-05-02
