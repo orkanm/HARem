@@ -471,7 +471,7 @@ action:
                     data:
                       value: >-
                         {% if is_on %}Turn ON Room?{% else %}Turn OFF Room?{% endif %}
-                  - delay: "00:00:04"
+                  - delay: "00:00:05"
                   - if: "{{ is_state(ov_entity, 'Turn ON Room?') or is_state(ov_entity, 'Turn OFF Room?') }}"
                     then:
                       - service: input_text.set_value
@@ -613,21 +613,23 @@ action:
 
           - delay: 0.05
 
-      # BACK -> Exit Room
-      - conditions: "{{ action == 'back' and path != 'ROOT' }}"
+      # BACK -> Exit Room or Clear Active Overlay Prompt
+      - conditions: "{{ action == 'back' }}"
         sequence:
           - service: input_text.set_value
             target: {entity_id: !input overlay}
             data: {value: ""}
-          - variables:
-              sorted_areas: "{{ areas() | sort }}"
-              restore_idx: "{{ sorted_areas.index(path) if path in sorted_areas else 0 }}"
-          - service: input_number.set_value
-            target: {entity_id: !input menu_index}
-            data: {value: "{{ restore_idx }}"}
-          - service: input_text.set_value
-            target: {entity_id: !input menu_path}
-            data: {value: "ROOT"}
+          - if: "{{ path != 'ROOT' and path != '' }}"
+            then:
+              - variables:
+                  sorted_areas: "{{ areas() | sort }}"
+                  restore_idx: "{{ sorted_areas.index(path) if path in sorted_areas else 0 }}"
+              - service: input_number.set_value
+                target: {entity_id: !input menu_index}
+                data: {value: "{{ restore_idx }}"}
+              - service: input_text.set_value
+                target: {entity_id: !input menu_path}
+                data: {value: "ROOT"}
 
   # 2. UPDATE DISPLAY (skip for rotation — overlay is shown, line_5 is the pct tracker)
   - if: "{{ action not in ['rotate_cw_hold', 'rotate_ccw_hold'] }}"

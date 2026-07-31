@@ -488,6 +488,12 @@ text_sensor:
   - platform: homeassistant
     id: remote_overlay
     entity_id: input_text.harem_overlay
+    on_value:
+      then:
+        - lambda: |-
+            if (x.empty() || x == " ") {
+              id(control_mode) = false;
+            }
 
   - platform: wifi_info
     ip_address:
