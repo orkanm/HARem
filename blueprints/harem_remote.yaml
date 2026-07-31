@@ -612,6 +612,10 @@ action:
                         continue_on_error: true
 
           - delay: 0.05
+          - delay: "00:00:05"
+          - service: input_text.set_value
+            target: {entity_id: !input overlay}
+            data: {value: ""}
 
       # BACK -> Exit Room or Clear Active Overlay Prompt
       - conditions: "{{ action == 'back' }}"
