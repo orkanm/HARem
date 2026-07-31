@@ -348,13 +348,7 @@ binary_sensor:
             if (id(control_mode)) {
                 id(control_mode) = false;
                 id(last_control_exit) = millis();
-                std::string st = id(remote_line_3_status).state;
-                std::string ov = id(remote_overlay).state;
-                if (st.find("(room)") != std::string::npos || ov.find("?") != std::string::npos) {
-                    id(send_click_event)->execute();
-                } else {
-                    id(send_refresh_event)->execute(); // Combined clear + refresh
-                }
+                id(send_refresh_event)->execute(); // Combined clear + refresh
                 id(my_display).update();
                 return;
             }
@@ -1206,15 +1200,11 @@ script:
     mode: restart
     then:
       - script.execute: idle_timer
-      - if:
-          condition:
-            lambda: 'return id(remote_overlay).state.find("?") == std::string::npos;'
-          then:
-            - homeassistant.service:
-                service: input_text.set_value
-                data:
-                  entity_id: input_text.harem_overlay
-                  value: ""
+      - homeassistant.service:
+          service: input_text.set_value
+          data:
+            entity_id: input_text.harem_overlay
+            value: ""
       - homeassistant.service:
           service: input_text.set_value
           data:
