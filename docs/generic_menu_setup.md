@@ -5,8 +5,8 @@ It requires **no maintenance**—if you add a device to a Room in Home Assistant
 
 > [!TIP]
 > **New! One-Click Setup**
-> * **[Download One-Click Package](file:///home/orquitto/Workspace/HARem/home_assistant/harem_package.yaml)** - Best for power users. Drop one file in, everything works.
-> * **[Import Blueprint](file:///home/orquitto/Workspace/HARem/blueprints/harem_remote.yaml)** - Best for UI users. Pick your helpers from a dropdown.
+> * **[Download One-Click Package](../home_assistant/harem_package.yaml)** - Best for power users. Drop one file in, everything works.
+> * **[Import Blueprint](../blueprints/harem_remote.yaml)** - Best for UI users. Pick your helpers from a dropdown.
 
 ---
 
@@ -14,7 +14,7 @@ It requires **no maintenance**—if you add a device to a Room in Home Assistant
 
 ### ✅ Option A: Drop-in Package (Recommended)
 The fastest method. Creates all 11 required helpers instantly.
-1. Download [harem_package.yaml](file:///home/orquitto/Workspace/HARem/home_assistant/harem_package.yaml) and place it in your Home Assistant `/config/packages/` folder.
+1. Download [harem_package.yaml](../home_assistant/harem_package.yaml) and place it in your Home Assistant `/config/packages/` folder.
 2. In your `configuration.yaml`, ensure you have: `homeassistant: { packages: !include_dir_named packages }`.
 3. Restart Home Assistant.
 
@@ -38,7 +38,7 @@ If you don't use packages, manually create these in **Settings > Devices & Servi
 
 All menu logic, dimming control, and screen updates are securely handled by the official Blueprint. Do not try to write this automation manually.
 
-1. Copy the content of [harem_remote.yaml](file:///home/orquitto/Workspace/HARem/blueprints/harem_remote.yaml) into your Home Assistant `/config/blueprints/automation/` folder.
+1. Copy the content of [harem_remote.yaml](../blueprints/harem_remote.yaml) into your Home Assistant `/config/blueprints/automation/` folder.
 2. Go to **Settings > Automations & Scenes > Blueprints** and find "HARem: Universal ESPHome Remote Controller".
 3. Click **Create Automation**.
 4. Use the dropdowns to select the Helpers you created in Step 1.

@@ -102,7 +102,7 @@ If the remote cannot connect to any configured WiFi network (e.g., you changed y
 
 #### ✅ Option A: Drop-in Package (Professional)
 The fastest method. Creates all 11 required helpers.
-1. Copy [harem_package.yaml](file:///home/orquitto/Workspace/HARem/home_assistant/harem_package.yaml) to your Home Assistant `/config/packages/` folder.
+1. Copy [harem_package.yaml](../home_assistant/harem_package.yaml) to your Home Assistant `/config/packages/` folder.
 2. In `configuration.yaml`, ensure you have: `homeassistant: { packages: !include_dir_named packages }`.
 3. Restart Home Assistant. **Done.**
 
@@ -125,16 +125,16 @@ Create these 11 Helpers manually in **Settings > Helpers**:
 
 ### 2. Home Assistant Automation (Blueprint)
 All logic is handled securely via Blueprint.
-1.  Copy the content of [harem_remote.yaml](file:///home/orquitto/Workspace/HARem/blueprints/harem_remote.yaml) into your Home Assistant `/config/blueprints/automation/` folder.
+1.  Copy the content of [harem_remote.yaml](../blueprints/harem_remote.yaml) into your Home Assistant `/config/blueprints/automation/` folder.
 2.  Go to **Settings > Automations & Scenes > Blueprints**.
 3.  Click **Create Automation** next to "HARem: Universal ESPHome Remote Controller".
 4.  Select your helpers from the dropdowns and click **Save**.
 
-**[View Setup Details](file:///home/orquitto/Workspace/HARem/docs/generic_menu_setup.md)**
+**[View Setup Details](generic_menu_setup.md)**
 
 ### 3. ESPHome Firmware
 The firmware handles hardware debouncing, display rendering, and event transmission.
-**[View Firmware Config](file:///home/orquitto/Workspace/HARem/remote_controller.yaml)**
+**[View Firmware Config](../remote_controller.yaml)**
 
 ## Troubleshooting
 
