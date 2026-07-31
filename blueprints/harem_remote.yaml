@@ -221,181 +221,235 @@ action:
             data: {value: ""}
           # The automation will now continue to the "UPDATE DISPLAY" section below
 
-      # CLICK -> Enter/Toggle or Confirm Bulk Action
+      # CLICK -> Enter/Toggle, Confirm Bulk Action, or Dismiss Active Feedback Overlay
       - conditions: "{{ action == 'click' and list_size > 0 }}"
         sequence:
-          - if: "{{ path == 'ROOT' or path == '' }}"
-            then:
-              - variables:
-                  ov_entity: !input overlay
-                  current_ov: "{{ states(ov_entity) }}"
-                  gm: "{{ guest_switch_entity }}"
-                  is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
-                  areas_list: >
-                    {% if is_guest %}
-                       {% set ns = namespace(areas=[]) %}
-                       {% for ent in guest_ents %}
-                         {% set a = area_id(ent) %}
-                         {% if a != none and a not in ns.areas %}
-                           {% set ns.areas = ns.areas + [a] %}
-                         {% endif %}
-                       {% endfor %}
-                       {{ ns.areas | sort | to_json }}
-                    {% else %}
-                       {{ areas() | sort | to_json }}
-                    {% endif %}
-                  selected_area: "{{ areas_list[idx % areas_list | length] if (areas_list is defined and areas_list | length > 0) else '' }}"
-                  selected_area_name: "{{ area_name(selected_area) or selected_area }}"
-                  raw_area_ents: "{{ area_entities(selected_area) | reject('is_hidden_entity') | list if selected_area != '' else [] }}"
-                  target_bulk_ents: >
-                    {% set allowed = raw_area_ents | select('in', bulk_ents) | list %}
-                    {% if is_guest %}
-                      {% set allowed = allowed | select('in', guest_ents) | list %}
-                    {% endif %}
-                    {{ allowed | join(',') }}
+          - variables:
+              ov_entity: !input overlay
+              current_ov: "{{ states(ov_entity) }}"
 
-              - choose:
-                  # CONFIRM BULK TURN ON
-                  - conditions: "{{ current_ov == 'Turn ON Room?' }}"
-                    sequence:
-                      - choose:
-                          - conditions: "{{ target_bulk_ents != '' }}"
-                            sequence:
-                              - service: input_text.set_value
-                                target: {entity_id: !input overlay}
-                                data: {value: "{{ selected_area_name }} ON"}
-                              - service: homeassistant.turn_on
-                                target: {entity_id: "{{ target_bulk_ents.split(',') }}"}
-                                continue_on_error: true
-                        default:
+          - choose:
+              # 1. CONFIRM BULK TURN ON (when prompt active on ROOT)
+              - conditions: "{{ (path == 'ROOT' or path == '') and current_ov == 'Turn ON Room?' }}"
+                sequence:
+                  - variables:
+                      gm: "{{ guest_switch_entity }}"
+                      is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
+                      areas_list: >
+                        {% if is_guest %}
+                           {% set ns = namespace(areas=[]) %}
+                           {% for ent in guest_ents %}
+                             {% set a = area_id(ent) %}
+                             {% if a != none and a not in ns.areas %}
+                               {% set ns.areas = ns.areas + [a] %}
+                             {% endif %}
+                           {% endfor %}
+                           {{ ns.areas | sort | to_json }}
+                        {% else %}
+                           {{ areas() | sort | to_json }}
+                        {% endif %}
+                      selected_area: "{{ areas_list[idx % areas_list | length] if (areas_list is defined and areas_list | length > 0) else '' }}"
+                      selected_area_name: "{{ area_name(selected_area) or selected_area }}"
+                      raw_area_ents: "{{ area_entities(selected_area) | reject('is_hidden_entity') | list if selected_area != '' else [] }}"
+                      target_bulk_ents: >
+                        {% set allowed = raw_area_ents | select('in', bulk_ents) | list %}
+                        {% if is_guest %}
+                          {% set allowed = allowed | select('in', guest_ents) | list %}
+                        {% endif %}
+                        {{ allowed | join(',') }}
+                  - choose:
+                      - conditions: "{{ target_bulk_ents != '' }}"
+                        sequence:
                           - service: input_text.set_value
                             target: {entity_id: !input overlay}
-                            data: {value: "No Bulk Devices"}
-                      - delay: "00:00:01.5"
+                            data: {value: "{{ selected_area_name }} ON"}
+                          - service: homeassistant.turn_on
+                            target: {entity_id: "{{ target_bulk_ents.split(',') }}"}
+                            continue_on_error: true
+                    default:
                       - service: input_text.set_value
                         target: {entity_id: !input overlay}
-                        data: {value: ""}
-                      - service: input_text.set_value
-                        target: {entity_id: !input line_5}
-                        data: {value: ""}
+                        data: {value: "No Bulk Devices"}
+                  - delay: "00:00:01.5"
+                  - service: input_text.set_value
+                    target: {entity_id: !input overlay}
+                    data: {value: ""}
+                  - service: input_text.set_value
+                    target: {entity_id: !input line_5}
+                    data: {value: ""}
 
-                  # CONFIRM BULK TURN OFF
-                  - conditions: "{{ current_ov == 'Turn OFF Room?' }}"
-                    sequence:
-                      - choose:
-                          - conditions: "{{ target_bulk_ents != '' }}"
-                            sequence:
-                              - service: input_text.set_value
-                                target: {entity_id: !input overlay}
-                                data: {value: "{{ selected_area_name }} OFF"}
-                              - service: homeassistant.turn_off
-                                target: {entity_id: "{{ target_bulk_ents.split(',') }}"}
-                                continue_on_error: true
-                        default:
+              # 2. CONFIRM BULK TURN OFF (when prompt active on ROOT)
+              - conditions: "{{ (path == 'ROOT' or path == '') and current_ov == 'Turn OFF Room?' }}"
+                sequence:
+                  - variables:
+                      gm: "{{ guest_switch_entity }}"
+                      is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
+                      areas_list: >
+                        {% if is_guest %}
+                           {% set ns = namespace(areas=[]) %}
+                           {% for ent in guest_ents %}
+                             {% set a = area_id(ent) %}
+                             {% if a != none and a not in ns.areas %}
+                               {% set ns.areas = ns.areas + [a] %}
+                             {% endif %}
+                           {% endfor %}
+                           {{ ns.areas | sort | to_json }}
+                        {% else %}
+                           {{ areas() | sort | to_json }}
+                        {% endif %}
+                      selected_area: "{{ areas_list[idx % areas_list | length] if (areas_list is defined and areas_list | length > 0) else '' }}"
+                      selected_area_name: "{{ area_name(selected_area) or selected_area }}"
+                      raw_area_ents: "{{ area_entities(selected_area) | reject('is_hidden_entity') | list if selected_area != '' else [] }}"
+                      target_bulk_ents: >
+                        {% set allowed = raw_area_ents | select('in', bulk_ents) | list %}
+                        {% if is_guest %}
+                          {% set allowed = allowed | select('in', guest_ents) | list %}
+                        {% endif %}
+                        {{ allowed | join(',') }}
+                  - choose:
+                      - conditions: "{{ target_bulk_ents != '' }}"
+                        sequence:
                           - service: input_text.set_value
                             target: {entity_id: !input overlay}
-                            data: {value: "No Bulk Devices"}
-                      - delay: "00:00:01.5"
+                            data: {value: "{{ selected_area_name }} OFF"}
+                          - service: homeassistant.turn_off
+                            target: {entity_id: "{{ target_bulk_ents.split(',') }}"}
+                            continue_on_error: true
+                    default:
                       - service: input_text.set_value
                         target: {entity_id: !input overlay}
-                        data: {value: ""}
-                      - service: input_text.set_value
-                        target: {entity_id: !input line_5}
-                        data: {value: ""}
+                        data: {value: "No Bulk Devices"}
+                  - delay: "00:00:01.5"
+                  - service: input_text.set_value
+                    target: {entity_id: !input overlay}
+                    data: {value: ""}
+                  - service: input_text.set_value
+                    target: {entity_id: !input line_5}
+                    data: {value: ""}
 
-                default:
+              # 3. DISMISS ACTIVE FEEDBACK OVERLAY (If any non-prompt overlay is currently active)
+              - conditions: "{{ current_ov != '' and current_ov != ' ' }}"
+                sequence:
+                  - service: input_text.set_value
+                    target: {entity_id: !input overlay}
+                    data: {value: ""}
+                  - service: input_text.set_value
+                    target: {entity_id: !input line_5}
+                    data: {value: ""}
+
+            # 4. NORMAL CLICK (No overlay active)
+            default:
+              - if: "{{ path == 'ROOT' or path == '' }}"
+                then:
+                  - variables:
+                      gm: "{{ guest_switch_entity }}"
+                      is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
+                      areas_list: >
+                        {% if is_guest %}
+                           {% set ns = namespace(areas=[]) %}
+                           {% for ent in guest_ents %}
+                             {% set a = area_id(ent) %}
+                             {% if a != none and a not in ns.areas %}
+                               {% set ns.areas = ns.areas + [a] %}
+                             {% endif %}
+                           {% endfor %}
+                           {{ ns.areas | sort | to_json }}
+                        {% else %}
+                           {{ areas() | sort | to_json }}
+                        {% endif %}
+                      selected_area: "{{ areas_list[idx % areas_list | length] if (areas_list is defined and areas_list | length > 0) else '' }}"
                   - service: input_text.set_value
                     target: {entity_id: !input menu_path}
                     data: {value: "{{ selected_area }}"}
                   - service: input_number.set_value
                     target: {entity_id: !input menu_index}
                     data: {value: 0}
-            else:
-              - variables:
-                  gm: "{{ guest_switch_entity }}"
-                  is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
-                  entities: >
-                    {% set raw_entities = area_entities(path) | reject('is_hidden_entity') | list %}
-                    {% set p1 = raw_entities | select('match', '^(light|media_player|cover|fan|lock)[.]') | sort | list %}
-                    {% set p2 = raw_entities | select('match', '^switch[.]') | sort | list %}
-                    {% set p3 = raw_entities | select('match', '^(button|input_boolean|scene|script)[.]') | sort | list %}
-                    {% set base = p1 + p2 + p3 %}
-                    {% if is_guest %}
-                      {% set base = base | select('in', guest_ents) | list %}
-                    {% endif %}
-                    {% set ns = namespace(final=[], names=[]) %}
-                    {% for ent in base %}
-                      {% set name = state_attr(ent, 'friendly_name') or ent.split('.')[1] %}
-                      {% if name not in ns.names %}
-                        {% set dev = device_id(ent) %}
-                        {% set keep = namespace(ok=true) %}
-                        {% if dev != none %}
-                          {% set ent_dom = ent.split('.')[0] %}
-                          {% for prev in ns.final %}
-                            {% if device_id(prev) == dev %}
-                              {% set prev_dom = prev.split('.')[0] %}
-                              {% set ent_pri = 1 if ent_dom in ['light', 'media_player', 'cover', 'fan', 'lock'] else (2 if ent_dom == 'switch' else 3) %}
-                              {% set prev_pri = 1 if prev_dom in ['light', 'media_player', 'cover', 'fan', 'lock'] else (2 if prev_dom in ['switch'] else 3) %}
-                              {% if prev_pri < ent_pri %}
-                                {% set keep.ok = false %}
-                              {% endif %}
+                else:
+                  - variables:
+                      gm: "{{ guest_switch_entity }}"
+                      is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
+                      entities: >
+                        {% set raw_entities = area_entities(path) | reject('is_hidden_entity') | list %}
+                        {% set p1 = raw_entities | select('match', '^(light|media_player|cover|fan|lock)[.]') | sort | list %}
+                        {% set p2 = raw_entities | select('match', '^switch[.]') | sort | list %}
+                        {% set p3 = raw_entities | select('match', '^(button|input_boolean|scene|script)[.]') | sort | list %}
+                        {% set base = p1 + p2 + p3 %}
+                        {% if is_guest %}
+                          {% set base = base | select('in', guest_ents) | list %}
+                        {% endif %}
+                        {% set ns = namespace(final=[], names=[]) %}
+                        {% for ent in base %}
+                          {% set name = state_attr(ent, 'friendly_name') or ent.split('.')[1] %}
+                          {% if name not in ns.names %}
+                            {% set dev = device_id(ent) %}
+                            {% set keep = namespace(ok=true) %}
+                            {% if dev != none %}
+                              {% set ent_dom = ent.split('.')[0] %}
+                              {% for prev in ns.final %}
+                                {% if device_id(prev) == dev %}
+                                  {% set prev_dom = prev.split('.')[0] %}
+                                  {% set ent_pri = 1 if ent_dom in ['light', 'media_player', 'cover', 'fan', 'lock'] else (2 if ent_dom == 'switch' else 3) %}
+                                  {% set prev_pri = 1 if prev_dom in ['light', 'media_player', 'cover', 'fan', 'lock'] else (2 if prev_dom in ['switch'] else 3) %}
+                                  {% if prev_pri < ent_pri %}
+                                    {% set keep.ok = false %}
+                                  {% endif %}
+                                {% endif %}
+                              {% endfor %}
                             {% endif %}
-                          {% endfor %}
-                        {% endif %}
-                        {% if keep.ok %}
-                          {% set ns.final = ns.final + [ent] %}
-                          {% set ns.names = ns.names + [name] %}
-                        {% endif %}
-                      {% endif %}
-                    {% endfor %}
-                    {{ ns.final | to_json }}
-                  selected_entity: "{{ entities[idx % entities | length] }}"
-                  friendly: "{{ state_attr(selected_entity, 'friendly_name') }}"
-                  current_state: "{{ states(selected_entity) }}"
-                  is_instant: "{{ selected_entity.split('.')[0] in ['scene', 'script', 'button'] }}"
-                  new_message: >
-                     {% if current_state == 'on' %} Turning Off...
-                     {% elif current_state == 'off' %} Turning On...
-                     {% else %} Activating... {% endif %}
-              
-              # 1. Show Feedback Logic (Overlay)
-              - service: input_text.set_value
-                target: {entity_id: !input overlay}
-                data: {value: "{{ new_message }}"}
-                
-              # 2. Perform Action
-              - choose:
-                  - conditions: "{{ current_state == 'on' or current_state == 'playing' }}"
-                    sequence:
-                      - service: homeassistant.turn_off
+                            {% if keep.ok %}
+                              {% set ns.final = ns.final + [ent] %}
+                              {% set ns.names = ns.names + [name] %}
+                            {% endif %}
+                          {% endif %}
+                        {% endfor %}
+                        {{ ns.final | to_json }}
+                      selected_entity: "{{ entities[idx % entities | length] }}"
+                      friendly: "{{ state_attr(selected_entity, 'friendly_name') }}"
+                      current_state: "{{ states(selected_entity) }}"
+                      is_instant: "{{ selected_entity.split('.')[0] in ['scene', 'script', 'button'] }}"
+                      new_message: >
+                         {% if current_state == 'on' %} Turning Off...
+                         {% elif current_state == 'off' %} Turning On...
+                         {% else %} Activating... {% endif %}
+
+                  # 1. Show Feedback Logic (Overlay)
+                  - service: input_text.set_value
+                    target: {entity_id: !input overlay}
+                    data: {value: "{{ new_message }}"}
+
+                  # 2. Perform Action
+                  - choose:
+                      - conditions: "{{ current_state == 'on' or current_state == 'playing' }}"
+                        sequence:
+                          - service: homeassistant.turn_off
+                            target: {entity_id: "{{ selected_entity }}"}
+                            continue_on_error: true
+                    default:
+                      - service: homeassistant.turn_on
                         target: {entity_id: "{{ selected_entity }}"}
                         continue_on_error: true
-                default:
-                  - service: homeassistant.turn_on
-                    target: {entity_id: "{{ selected_entity }}"}
-                    continue_on_error: true
-              
-              # 3. Wait for State Change (skipped for instant entities)
-              - if: "{{ not is_instant }}"
-                then:
-                  - wait_template: "{{ states(selected_entity) != current_state }}"
-                    timeout: "00:00:05"
-                  - if: "{{ not wait.completed }}"
+
+                  # 3. Wait for State Change (skipped for instant entities)
+                  - if: "{{ not is_instant }}"
                     then:
-                      - service: input_text.set_value
-                        target: {entity_id: !input overlay}
-                        data: {value: "Failed!"}
-                      - delay: "00:00:02"
-                else:
-                  - delay: "00:00:01"
-                
-              # 4. Clear Overlay
-              - service: input_text.set_value
-                target: {entity_id: !input overlay}
-                data: {value: ""}
-              - service: input_text.set_value
-                target: {entity_id: !input line_5}
-                data: {value: ""}
+                      - wait_template: "{{ states(selected_entity) != current_state }}"
+                        timeout: "00:00:05"
+                      - if: "{{ not wait.completed }}"
+                        then:
+                          - service: input_text.set_value
+                            target: {entity_id: !input overlay}
+                            data: {value: "Failed!"}
+                          - delay: "00:00:02"
+                    else:
+                      - delay: "00:00:01"
+
+                  # 4. Clear Overlay
+                  - service: input_text.set_value
+                    target: {entity_id: !input overlay}
+                    data: {value: ""}
+                  - service: input_text.set_value
+                    target: {entity_id: !input line_5}
+                    data: {value: ""}
 
       # ROTATE HOLD ON ROOM -> Ask Confirmation for Bulk Room Power Control
       - conditions: "{{ (action == 'rotate_cw_hold' or action == 'rotate_ccw_hold') and (path == 'ROOT' or path == '') }}"

@@ -7,6 +7,7 @@ All notable changes to the HARem project will be documented in this file.
 ### Fixed
 - **Linear Scrolling**: Fixed a bug where short menus (fewer than 5 items) padded the display with empty lines that wrapped improperly, causing blank gaps. Changed the logic to clamp list elements in short menus while retaining infinite circular scrolling for larger ones.
 - **Dimming Status Evaluation**: Fixed an issue where the remote reported dimmable lights as "Not Supported !" because the entity was missing a `friendly_name` and the status template scoping prevented the dimming support asterisk (`*`) from rendering properly. Jinja loops scoping was simplified to directly fetch by modulus. Added a fallback to `object_id` when `friendly_name` is missing to prevent invisible elements.
+- **Overlay Click Passthrough**: Fixed an issue where pressing the button while an active feedback overlay (e.g., "Living Room ON", "Living Room OFF", "Turning Off...") was displayed caused the remote to navigate into the room menu and toggle a device inside that room. Button presses while an active feedback overlay is showing now cleanly dismiss the overlay without triggering menu navigation or entity state changes.
 
 
 ## [v0.7.0] - 2026-05-02
