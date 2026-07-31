@@ -72,15 +72,20 @@ flowchart TD
 When pushing the encoder in **Control Mode**, it's common for a user's finger to accidentally rotate the knob a tiny bit during the press/release. 
 - If `processed_rotate_hold` is flagged (meaning a rotation occurred while the button was down), the release event is consumed and *ignored* instead of triggering an exit click. This ensures smooth dimming without accidentally exiting.
 
-### Normal Navigation
+### Normal Navigation & Gesture Control
 - **Rotate Clockwise (Free)**: Sends `esphome.remote_action` -> `next`
 - **Rotate Counter-Clockwise (Free)**: Sends `esphome.remote_action` -> `prev`
+- **Press & Twist on Room (ROOT Menu)**:
+  - **Rotate CW while Holding**: Prompts `Turn ON Room?` -> **Click** to confirm turning ON allowed room devices.
+  - **Rotate CCW while Holding**: Prompts `Turn OFF Room?` -> **Click** to confirm turning OFF allowed room devices.
+  - *(Rotating away or waiting 4s cancels the prompt)*
+- **Press & Twist on Device (Room View)**: Adjust device brightness or volume.
 
 ---
 
-## 3. Control Mode (The "Lock" Flow)
+## 3. Control Mode (The "Lock" Flow & Bulk Room Control)
 
-Control Mode allows continuous parameter adjustment (like brightness or volume) without sending multiple clicks. 
+Control Mode allows continuous parameter adjustment (like brightness or volume) when on a device, or instant bulk power toggle when on a room. 
 
 ```mermaid
 stateDiagram-v2
@@ -90,16 +95,17 @@ stateDiagram-v2
     state PressAndTwist {
         direction LR
         [*] --> CheckStatus
-        CheckStatus --> IsDimmable : Status has '*' ?
-        IsDimmable --> ControlMode : YES
-        IsDimmable --> Reject : NO (Overlay 'Not Supported')
+        CheckStatus --> IsSupported : Status has '*' ?
+        IsSupported --> ControlMode : YES (Device or Room)
+        IsSupported --> Reject : NO (Overlay 'Not Supported')
     }
     
-    ControlMode --> ControlMode : Rotate (Sends 'rotate_cw_hold')
-    ControlMode --> Normal : Short Click (Exit)
+    ControlMode --> ControlMode : Rotate (Sends 'rotate_cw_hold' / 'rotate_ccw_hold')
+    ControlMode --> Normal : Short Click / Timeout (Exit)
 ```
 
-**Constraints**: You can *only* enter Control Mode if the active Home Assistant entity is dimmable/adjustable, which HA signals by appending a `*` to `line_3_status`.
+**Constraints**: You can enter Control Mode if the active item is dimmable/adjustable or a room, signaled by appending a `*` to `line_3_status` (`(room) *` for rooms).
+
 
 ---
 
