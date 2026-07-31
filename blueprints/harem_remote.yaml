@@ -966,3 +966,4 @@ action:
                - service: input_text.set_value
                  target: {entity_id: !input line_5}
                  data: {value: ""}
+                 
