@@ -657,6 +657,7 @@ action:
           guest_ents: !input guest_included_entities
           menu_total_ent: !input menu_total
           list_size_val: "{{ list_size }}"
+          line_3_status_ent: !input line_3_status
 
       - if: "{{ menu_total_ent != 'none' }}"
         then:
@@ -875,41 +876,46 @@ action:
                   value: >
                     {% set entity = list[idx % list|length] %}
                     {% if entity %}
-                      {% set dom = entity.split('.')[0] %}
-                      {% set ns = namespace(can_dim=false) %}
-                      {% if dom == 'light' %}
-                        {# Check for brightness support bit 0x01 (1) #}
-                        {% if (state_attr(entity, 'supported_features') | int(0) | bitwise_and(1)) > 0 %}
-                          {% set ns.can_dim = true %}
+                      {% set current_status = states(line_3_status_ent) %}
+                      {% if action == 'refresh' and current_status != '' and current_status.startswith('(') and not current_status.startswith('(room)') %}
+                        {{ current_status }}
+                      {% else %}
+                        {% set dom = entity.split('.')[0] %}
+                        {% set ns = namespace(can_dim=false) %}
+                        {% if dom == 'light' %}
+                          {# Check for brightness support bit 0x01 (1) #}
+                          {% if (state_attr(entity, 'supported_features') | int(0) | bitwise_and(1)) > 0 %}
+                            {% set ns.can_dim = true %}
+                          {% endif %}
+                          {# Check unique color modes #}
+                          {% set modes = state_attr(entity, 'supported_color_modes') %}
+                          {% if modes %}
+                            {% for m in modes %}
+                              {% if m != 'onoff' %}
+                                 {% set ns.can_dim = true %}
+                              {% endif %}
+                            {% endfor %}
+                          {% endif %}
+                        {% elif dom == 'media_player' %}
+                           {# Check for volume_set bit 0x04 (4) #}
+                           {% if (state_attr(entity, 'supported_features') | int(0) | bitwise_and(4)) > 0 %}
+                             {% set ns.can_dim = true %}
+                           {% endif %}
                         {% endif %}
-                        {# Check unique color modes #}
-                        {% set modes = state_attr(entity, 'supported_color_modes') %}
-                        {% if modes %}
-                          {% for m in modes %}
-                            {% if m != 'onoff' %}
-                               {% set ns.can_dim = true %}
-                            {% endif %}
-                          {% endfor %}
+                        {% set final_state = states(entity) %}
+                        {% if final_state == 'on' or final_state == 'playing' %}
+                           {% if dom == 'light' and ns.can_dim and state_attr(entity, 'brightness') != none %}
+                              {% set raw = (state_attr(entity, 'brightness') | int(0) / 2.55) %}
+                              {% set calc = (((raw / 10) | round(0, 'common')) * 10) | int %}
+                              {% set final_state = 'on' if calc <= 0 else (calc | string + '%') %}
+                           {% elif dom == 'media_player' and ns.can_dim and state_attr(entity, 'volume_level') != none %}
+                              {% set raw = (state_attr(entity, 'volume_level') | float(0) * 100) %}
+                              {% set calc = (((raw / 10) | round(0, 'common')) * 10) | int %}
+                              {% set final_state = 'playing' if calc <= 0 else (calc | string + '%') %}
+                           {% endif %}
                         {% endif %}
-                      {% elif dom == 'media_player' %}
-                         {# Check for volume_set bit 0x04 (4) #}
-                         {% if (state_attr(entity, 'supported_features') | int(0) | bitwise_and(4)) > 0 %}
-                           {% set ns.can_dim = true %}
-                         {% endif %}
+                        ({{ final_state | truncate(12, True, '..') }}){{ ' *' if ns.can_dim else '' }}
                       {% endif %}
-                      {% set final_state = states(entity) %}
-                      {% if final_state == 'on' or final_state == 'playing' %}
-                         {% if dom == 'light' and ns.can_dim and state_attr(entity, 'brightness') != none %}
-                            {% set raw = (state_attr(entity, 'brightness') | int(0) / 2.55) %}
-                            {% set calc = (((raw / 10) | round(0, 'common')) * 10) | int %}
-                            {% set final_state = 'off' if calc <= 0 else (calc | string + '%') %}
-                         {% elif dom == 'media_player' and ns.can_dim and state_attr(entity, 'volume_level') != none %}
-                            {% set raw = (state_attr(entity, 'volume_level') | float(0) * 100) %}
-                            {% set calc = (((raw / 10) | round(0, 'common')) * 10) | int %}
-                            {% set final_state = 'off' if calc <= 0 else (calc | string + '%') %}
-                         {% endif %}
-                      {% endif %}
-                      ({{ final_state | truncate(12, True, '..') }}){{ ' *' if ns.can_dim else '' }}
                     {% endif %}
               - service: input_text.set_value
                 target: {entity_id: !input line_4}
