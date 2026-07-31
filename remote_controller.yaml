@@ -249,6 +249,9 @@ globals:
   - id: demo_overlay_time
     type: uint32_t
     initial_value: '0'
+  - id: demo_control_mode
+    type: bool
+    initial_value: 'false'
   - id: demo_light1_pct
     type: int
     initial_value: '80'
@@ -262,6 +265,33 @@ globals:
     type: bool
     initial_value: 'false'
   - id: demo_lock_state
+    type: bool
+    initial_value: 'true'
+  - id: demo_bed_light_pct
+    type: int
+    initial_value: '60'
+  - id: demo_ac_on
+    type: bool
+    initial_value: 'false'
+  - id: demo_bed_audio_pct
+    type: int
+    initial_value: '30'
+  - id: demo_coffee_on
+    type: bool
+    initial_value: 'false'
+  - id: demo_counter_light_pct
+    type: int
+    initial_value: '100'
+  - id: demo_kettle_on
+    type: bool
+    initial_value: 'false'
+  - id: demo_desk_light_pct
+    type: int
+    initial_value: '50'
+  - id: demo_lightbar_pct
+    type: int
+    initial_value: '80'
+  - id: demo_pc_on
     type: bool
     initial_value: 'true'
   - id: battery_percent
@@ -476,7 +506,10 @@ binary_sensor:
                if (id(is_awake)) {
                  if (id(demo_mode)) {
                     id(idle_timer)->execute();
-                    if (id(demo_overlay) != "") {
+                    if (id(demo_control_mode) || id(demo_overlay).rfind("Bright", 0) == 0 || id(demo_overlay).rfind("Vol", 0) == 0) {
+                        id(demo_control_mode) = false;
+                        id(demo_overlay) = "";
+                    } else if (id(demo_overlay) != "") {
                         if (id(demo_overlay) == "Turn ON Room?") {
                             std::string r_name = (id(demo_index) == 0) ? "Living Room" : (id(demo_index) == 1 ? "Bedroom" : (id(demo_index) == 2 ? "Kitchen" : "Office"));
                             id(demo_overlay) = r_name + " ON";
@@ -493,7 +526,15 @@ binary_sensor:
                             id(demo_path) = id(demo_index) + 1;
                             id(demo_index) = 0;
                         } else if (id(demo_path) == 1) { // Living Room
-                            if (id(demo_index) == 2) {
+                            if (id(demo_index) == 0) {
+                                if (id(demo_light1_pct) > 0) { id(demo_light1_pct) = 0; id(demo_overlay) = "Turning Off..."; }
+                                else { id(demo_light1_pct) = 80; id(demo_overlay) = "Turning On..."; }
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 1) {
+                                if (id(demo_speaker_pct) > 0) { id(demo_speaker_pct) = 0; id(demo_overlay) = "Pausing..."; }
+                                else { id(demo_speaker_pct) = 50; id(demo_overlay) = "Playing..."; }
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 2) {
                                 id(demo_lamp_on) = !id(demo_lamp_on);
                                 id(demo_overlay) = id(demo_lamp_on) ? "Turning On..." : "Turning Off...";
                                 id(demo_overlay_time) = millis();
@@ -506,9 +547,48 @@ binary_sensor:
                                 id(demo_overlay) = id(demo_lock_state) ? "Locking..." : "Unlocking...";
                                 id(demo_overlay_time) = millis();
                             }
-                        } else if (id(demo_path) >= 2 && id(demo_path) <= 4) {
-                            id(demo_overlay) = "Toggled !";
-                            id(demo_overlay_time) = millis();
+                        } else if (id(demo_path) == 2) { // Bedroom
+                            if (id(demo_index) == 0) {
+                                if (id(demo_bed_light_pct) > 0) { id(demo_bed_light_pct) = 0; id(demo_overlay) = "Turning Off..."; }
+                                else { id(demo_bed_light_pct) = 60; id(demo_overlay) = "Turning On..."; }
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 1) {
+                                id(demo_ac_on) = !id(demo_ac_on);
+                                id(demo_overlay) = id(demo_ac_on) ? "Turning On..." : "Turning Off...";
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 2) {
+                                if (id(demo_bed_audio_pct) > 0) { id(demo_bed_audio_pct) = 0; id(demo_overlay) = "Pausing..."; }
+                                else { id(demo_bed_audio_pct) = 30; id(demo_overlay) = "Playing..."; }
+                                id(demo_overlay_time) = millis();
+                            }
+                        } else if (id(demo_path) == 3) { // Kitchen
+                            if (id(demo_index) == 0) {
+                                id(demo_coffee_on) = !id(demo_coffee_on);
+                                id(demo_overlay) = id(demo_coffee_on) ? "Turning On..." : "Turning Off...";
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 1) {
+                                if (id(demo_counter_light_pct) > 0) { id(demo_counter_light_pct) = 0; id(demo_overlay) = "Turning Off..."; }
+                                else { id(demo_counter_light_pct) = 100; id(demo_overlay) = "Turning On..."; }
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 2) {
+                                id(demo_kettle_on) = !id(demo_kettle_on);
+                                id(demo_overlay) = id(demo_kettle_on) ? "Turning On..." : "Turning Off...";
+                                id(demo_overlay_time) = millis();
+                            }
+                        } else if (id(demo_path) == 4) { // Office
+                            if (id(demo_index) == 0) {
+                                if (id(demo_desk_light_pct) > 0) { id(demo_desk_light_pct) = 0; id(demo_overlay) = "Turning Off..."; }
+                                else { id(demo_desk_light_pct) = 50; id(demo_overlay) = "Turning On..."; }
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 1) {
+                                if (id(demo_lightbar_pct) > 0) { id(demo_lightbar_pct) = 0; id(demo_overlay) = "Turning Off..."; }
+                                else { id(demo_lightbar_pct) = 80; id(demo_overlay) = "Turning On..."; }
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 2) {
+                                id(demo_pc_on) = !id(demo_pc_on);
+                                id(demo_overlay) = id(demo_pc_on) ? "Turning On..." : "Turning Off...";
+                                id(demo_overlay_time) = millis();
+                            }
                         }
                     }
                     id(my_display).update();
@@ -532,6 +612,7 @@ binary_sensor:
                }
              } else {
                 if (id(demo_mode)) {
+                   id(demo_control_mode) = false;
                    if (id(demo_overlay) != "") {
                        id(demo_overlay) = "";
                    } else if (id(demo_path) != 0) {
@@ -598,21 +679,34 @@ sensor:
       - lambda: |-
           if (id(demo_mode) && !id(settings_mode)) {
              id(handle_settings_hold)->stop();
-             if (id(encoder_button).state) {
+             bool is_dimmable = false;
+             bool is_speaker = false;
+             int *target_pct = nullptr;
+             if (id(demo_path) == 1) {
+                 if (id(demo_index) == 0) { is_dimmable = true; target_pct = &id(demo_light1_pct); }
+                 else if (id(demo_index) == 1) { is_dimmable = true; is_speaker = true; target_pct = &id(demo_speaker_pct); }
+             } else if (id(demo_path) == 2) {
+                 if (id(demo_index) == 0) { is_dimmable = true; target_pct = &id(demo_bed_light_pct); }
+                 else if (id(demo_index) == 2) { is_dimmable = true; is_speaker = true; target_pct = &id(demo_bed_audio_pct); }
+             } else if (id(demo_path) == 3) {
+                 if (id(demo_index) == 1) { is_dimmable = true; target_pct = &id(demo_counter_light_pct); }
+             } else if (id(demo_path) == 4) {
+                 if (id(demo_index) == 0) { is_dimmable = true; target_pct = &id(demo_desk_light_pct); }
+                 else if (id(demo_index) == 1) { is_dimmable = true; target_pct = &id(demo_lightbar_pct); }
+             }
+
+             if (id(encoder_button).state || id(demo_control_mode)) {
                  id(processed_rotate_hold) = true;
-                 if (id(demo_path) == 0) {
+                 if (is_dimmable && target_pct != nullptr) {
+                     id(demo_control_mode) = true;
+                     *target_pct = std::min(100, *target_pct + 10);
+                     id(demo_overlay) = (is_speaker ? "Vol " : "Bright ") + std::to_string(*target_pct) + "%";
+                     id(demo_overlay_time) = millis();
+                 } else if (id(demo_path) == 0) {
                      id(demo_overlay) = "Turn ON Room?";
                      id(demo_overlay_time) = millis();
-                 } else if (id(demo_path) == 1) {
-                     if (id(demo_index) == 0) {
-                         id(demo_light1_pct) = std::min(100, id(demo_light1_pct) + 10);
-                         id(demo_overlay) = "Bright " + std::to_string(id(demo_light1_pct)) + "%";
-                         id(demo_overlay_time) = millis();
-                     } else if (id(demo_index) == 1) {
-                         id(demo_speaker_pct) = std::min(100, id(demo_speaker_pct) + 10);
-                         id(demo_overlay) = "Vol " + std::to_string(id(demo_speaker_pct)) + "%";
-                         id(demo_overlay_time) = millis();
-                     }
+                 } else {
+                     id(show_local_warning)->execute();
                  }
              } else {
                  if (id(demo_overlay) == "Turn ON Room?" || id(demo_overlay) == "Turn OFF Room?") {
@@ -712,21 +806,34 @@ sensor:
       - lambda: |-
           if (id(demo_mode) && !id(settings_mode)) {
              id(handle_settings_hold)->stop();
-             if (id(encoder_button).state) {
+             bool is_dimmable = false;
+             bool is_speaker = false;
+             int *target_pct = nullptr;
+             if (id(demo_path) == 1) {
+                 if (id(demo_index) == 0) { is_dimmable = true; target_pct = &id(demo_light1_pct); }
+                 else if (id(demo_index) == 1) { is_dimmable = true; is_speaker = true; target_pct = &id(demo_speaker_pct); }
+             } else if (id(demo_path) == 2) {
+                 if (id(demo_index) == 0) { is_dimmable = true; target_pct = &id(demo_bed_light_pct); }
+                 else if (id(demo_index) == 2) { is_dimmable = true; is_speaker = true; target_pct = &id(demo_bed_audio_pct); }
+             } else if (id(demo_path) == 3) {
+                 if (id(demo_index) == 1) { is_dimmable = true; target_pct = &id(demo_counter_light_pct); }
+             } else if (id(demo_path) == 4) {
+                 if (id(demo_index) == 0) { is_dimmable = true; target_pct = &id(demo_desk_light_pct); }
+                 else if (id(demo_index) == 1) { is_dimmable = true; target_pct = &id(demo_lightbar_pct); }
+             }
+
+             if (id(encoder_button).state || id(demo_control_mode)) {
                  id(processed_rotate_hold) = true;
-                 if (id(demo_path) == 0) {
+                 if (is_dimmable && target_pct != nullptr) {
+                     id(demo_control_mode) = true;
+                     *target_pct = std::max(0, *target_pct - 10);
+                     id(demo_overlay) = (is_speaker ? "Vol " : "Bright ") + std::to_string(*target_pct) + "%";
+                     id(demo_overlay_time) = millis();
+                 } else if (id(demo_path) == 0) {
                      id(demo_overlay) = "Turn OFF Room?";
                      id(demo_overlay_time) = millis();
-                 } else if (id(demo_path) == 1) {
-                     if (id(demo_index) == 0) {
-                         id(demo_light1_pct) = std::max(0, id(demo_light1_pct) - 10);
-                         id(demo_overlay) = "Bright " + std::to_string(id(demo_light1_pct)) + "%";
-                         id(demo_overlay_time) = millis();
-                     } else if (id(demo_index) == 1) {
-                         id(demo_speaker_pct) = std::max(0, id(demo_speaker_pct) - 10);
-                         id(demo_overlay) = "Vol " + std::to_string(id(demo_speaker_pct)) + "%";
-                         id(demo_overlay_time) = millis();
-                     }
+                 } else {
+                     id(show_local_warning)->execute();
                  }
              } else {
                  if (id(demo_overlay) == "Turn ON Room?" || id(demo_overlay) == "Turn OFF Room?") {
@@ -1122,6 +1229,7 @@ display:
           // Check 5-second inactivity timeout for demo overlay
           if (id(demo_overlay) != "" && (millis() - id(demo_overlay_time) > 5000)) {
               id(demo_overlay) = "";
+              id(demo_control_mode) = false;
           }
 
           if (id(demo_overlay) != "") {
@@ -1135,18 +1243,30 @@ display:
                   items = {{"Living Room", "(room)"}, {"Bedroom", "(room)"}, {"Kitchen", "(room)"}, {"Office", "(room)"}, {"HARem Specs", ""}};
               } else if (p == 1) { // Living Room
                   items = {
-                      {"Ceiling Light", "(" + std::to_string(id(demo_light1_pct)) + "%) *"},
-                      {"TV Speaker", "(" + std::to_string(id(demo_speaker_pct)) + "%) *"},
+                      {"Ceiling Light", id(demo_light1_pct) > 0 ? ("(" + std::to_string(id(demo_light1_pct)) + "%) *") : "(off) *"},
+                      {"TV Speaker", id(demo_speaker_pct) > 0 ? ("(" + std::to_string(id(demo_speaker_pct)) + "%) *") : "(off) *"},
                       {"Floor Lamp", id(demo_lamp_on) ? "(on)" : "(off)"},
                       {"Standing Fan", id(demo_fan_on) ? "(on)" : "(off)"},
                       {"Front Door", id(demo_lock_state) ? "(locked)" : "(unlocked)"}
                   };
               } else if (p == 2) { // Bedroom
-                  items = {{"Nightstand Light", "(60%) *"}, {"Air Conditioner", "(off)"}, {"Bedside Audio", "(30%) *"}};
+                  items = {
+                      {"Nightstand Light", id(demo_bed_light_pct) > 0 ? ("(" + std::to_string(id(demo_bed_light_pct)) + "%) *") : "(off) *"},
+                      {"Air Conditioner", id(demo_ac_on) ? "(on)" : "(off)"},
+                      {"Bedside Audio", id(demo_bed_audio_pct) > 0 ? ("(" + std::to_string(id(demo_bed_audio_pct)) + "%) *") : "(off) *"}
+                  };
               } else if (p == 3) { // Kitchen
-                  items = {{"Coffee Maker", "(off)"}, {"Counter Light", "(100%) *"}, {"Smart Kettle", "(off)"}};
+                  items = {
+                      {"Coffee Maker", id(demo_coffee_on) ? "(on)" : "(off)"},
+                      {"Counter Light", id(demo_counter_light_pct) > 0 ? ("(" + std::to_string(id(demo_counter_light_pct)) + "%) *") : "(off) *"},
+                      {"Smart Kettle", id(demo_kettle_on) ? "(on)" : "(off)"}
+                  };
               } else if (p == 4) { // Office
-                  items = {{"Desk Lamp", "(50%) *"}, {"Monitor Lightbar", "(on) *"}, {"Workstation PC", "(on)"}};
+                  items = {
+                      {"Desk Lamp", id(demo_desk_light_pct) > 0 ? ("(" + std::to_string(id(demo_desk_light_pct)) + "%) *") : "(off) *"},
+                      {"Monitor Lightbar", id(demo_lightbar_pct) > 0 ? ("(" + std::to_string(id(demo_lightbar_pct)) + "%) *") : "(off) *"},
+                      {"Workstation PC", id(demo_pc_on) ? "(on)" : "(off)"}
+                  };
               } else { // HARem Specs
                   items = {
                       {"MCU: ESP32-C3 RISC-V", ""},
