@@ -206,18 +206,12 @@ action:
           - service: input_text.set_value
             target: {entity_id: !input overlay}
             data: {value: ""}
-          - service: input_text.set_value
-            target: {entity_id: !input line_5}
-            data: {value: ""}
 
       # REFRESH -> Explicitly Redraw Screen
       - conditions: "{{ action == 'refresh' }}"
         sequence:
           - service: input_text.set_value
             target: {entity_id: !input overlay}
-            data: {value: ""}
-          - service: input_text.set_value
-            target: {entity_id: !input line_5}
             data: {value: ""}
           # The automation will now continue to the "UPDATE DISPLAY" section below
 
@@ -274,9 +268,6 @@ action:
                   - service: input_text.set_value
                     target: {entity_id: !input overlay}
                     data: {value: ""}
-                  - service: input_text.set_value
-                    target: {entity_id: !input line_5}
-                    data: {value: ""}
 
               # 2. CONFIRM BULK TURN OFF (when prompt active on ROOT)
               - conditions: "{{ (path == 'ROOT' or path == '') and current_ov == 'Turn OFF Room?' }}"
@@ -323,18 +314,12 @@ action:
                   - service: input_text.set_value
                     target: {entity_id: !input overlay}
                     data: {value: ""}
-                  - service: input_text.set_value
-                    target: {entity_id: !input line_5}
-                    data: {value: ""}
 
               # 3. DISMISS ACTIVE FEEDBACK OVERLAY (If any non-prompt overlay is currently active)
               - conditions: "{{ current_ov != '' and current_ov != ' ' }}"
                 sequence:
                   - service: input_text.set_value
                     target: {entity_id: !input overlay}
-                    data: {value: ""}
-                  - service: input_text.set_value
-                    target: {entity_id: !input line_5}
                     data: {value: ""}
 
             # 4. NORMAL CLICK (No overlay active)
@@ -446,9 +431,6 @@ action:
                   # 4. Clear Overlay
                   - service: input_text.set_value
                     target: {entity_id: !input overlay}
-                    data: {value: ""}
-                  - service: input_text.set_value
-                    target: {entity_id: !input line_5}
                     data: {value: ""}
 
       # ROTATE HOLD ON ROOM -> Ask Confirmation for Bulk Room Power Control
