@@ -36,7 +36,13 @@ jobs:
           echo "harem_ap_password: '12345678'" >> secrets.yaml
 
       - name: Build Firmware
-        run: esphome compile remote_controller.yaml
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            TAG_VER="${GITHUB_REF#refs/tags/}"
+            esphome compile -s fw_version "${TAG_VER}" remote_controller.yaml
+          else
+            esphome compile remote_controller.yaml
+          fi
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v7

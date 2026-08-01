@@ -4,7 +4,11 @@
 substitutions:
   name: "ha-remote"
   friendly_name: "HA Remote Controller"
-  fw_version: "v0.7.2"
+  version_major: "0"
+  version_minor: "7"
+  version_patch: "2"
+  version_prerelease: "-DEMO-MODE" # Set to "" for official releases, or "-rc.1", "-beta", etc.
+  fw_version: "v${version_major}.${version_minor}.${version_patch}${version_prerelease}"
 
 dashboard_import:
   package_import_url: github://orkanm/HARem/remote_controller.yaml
@@ -14,7 +18,7 @@ esphome:
   friendly_name: HARem
   project:
     name: "orkanm.harem"
-    version: "v0.7.2"
+    version: ${fw_version}
   on_boot:
     - priority: 800
       then:
