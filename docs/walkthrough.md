@@ -65,6 +65,9 @@ sequenceDiagram
 *   **Features**:
     *   **Brightness**: Adjust OLED contrast (0-100%).
     *   **Standby**: Adjust timeout (10-300s).
+    *   **Sleep**: Adjust sleep timeout (10-300s).
+    *   **Animations**: Toggle smooth UI progress bar animations (ON/OFF).
+    *   **Demo Mode**: Standalone offline demonstration mode (`Demo: [ON]` / `Demo: [OFF]`).
     *   **Network Info**: View SSID and IP Address.
 *   **Storage**: Settings persist in flash memory (retained after reboot).
 
@@ -75,6 +78,9 @@ If the remote cannot connect to any configured WiFi network (e.g., you changed y
 3.  **Password**: Enter `4jNJPSLAfajjdHh3`.
 4.  **Configure**: A portal should pop up automatically (or go to `192.168.4.1`).
 5.  **Select**: Click your new WiFi network and enter the password. The device will save it and reboot.
+
+> [!NOTE]
+> **Input Guarding**: While the "WIFI FAILED!" hotspot screen or OTA update screen is displayed, rotary encoder rotation and button press/release actions are completely suppressed to prevent background state modifications.
 
 ### 8. Final Verification (v0.7.0)
 - **Startup**: Verified sequence (Splash -> Waiting -> v0.7.0).
@@ -90,6 +96,8 @@ If the remote cannot connect to any configured WiFi network (e.g., you changed y
 ### 10. Final Verification (v0.7.2)
 - **Overlay Dismissal & Timeout**: Verified 5-second inactivity timeout and long-press BACK button overlay dismissal across bulk room power and individual device dimming modes.
 - **Line 5 Sync**: Verified synchronized 5-line rendering upon returning from overlays.
+- **Hotspot Overlay Input Protection (Issue #42)**: Verified that user inputs are ignored while hotspot or OTA overlays are active, and transient settings states reset cleanly upon entering hotspot mode.
+- **Bulk Room Power Control**: Verified Press & Twist on room items on the ROOT menu forwards events to Home Assistant, and confirmed button clicks send `action: click` to execute bulk room turn on (`Turn ON Room?`) / turn off (`Turn OFF Room?`).
 
 ## 5. Next Steps
 - [ ] Mount hardware in final enclosure.

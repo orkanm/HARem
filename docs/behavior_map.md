@@ -78,9 +78,9 @@ When pushing the encoder in **Control Mode**, it's common for a user's finger to
 
 ---
 
-## 3. Control Mode (The "Lock" Flow)
+## 3. Control Mode & Bulk Power Control Flow
 
-Control Mode allows continuous parameter adjustment (like brightness or volume) without sending multiple clicks. 
+Control Mode allows continuous parameter adjustment (like brightness or volume) or triggering Bulk Room Power Control without sending repetitive clicks.
 
 ```mermaid
 stateDiagram-v2
@@ -89,17 +89,25 @@ stateDiagram-v2
     
     state PressAndTwist {
         direction LR
-        [*] --> CheckStatus
-        CheckStatus --> IsDimmable : Status has '*' ?
-        IsDimmable --> ControlMode : YES
+        [*] --> CheckLocation
+        CheckLocation --> RoomList : ROOT Menu (Room List) ?
+        RoomList --> SendBulkEvent : YES (Sends 'rotate_cw_hold' / 'rotate_ccw_hold')
+        CheckLocation --> EntityList : In Room (Entity List) ?
+        EntityList --> IsDimmable : Status has '*' ?
+        IsDimmable --> SendDimEvent : YES (Control Mode & Dim Overlay)
         IsDimmable --> Reject : NO (Overlay 'Not Supported')
     }
     
-    ControlMode --> ControlMode : Rotate (Sends 'rotate_cw_hold')
-    ControlMode --> Normal : Short Click (Exit)
+    SendBulkEvent --> PromptActive : HA sets Overlay ('Turn ON Room?')
+    PromptActive --> ExecuteBulk : Short Click on Prompt (Sends 'click' -> HA turns ON/OFF room)
+    SendDimEvent --> SendDimEvent : Rotate (Adjusts Brightness/Vol)
+    SendDimEvent --> Normal : Short Click (Exits Control Mode)
 ```
 
-**Constraints**: You can *only* enter Control Mode if the active Home Assistant entity is dimmable/adjustable, which HA signals by appending a `*` to `line_3_status`.
+**Interaction Rules**:
+1. **Bulk Room Power**: Executing Press & Twist on the `ROOT` menu sends `rotate_cw_hold` or `rotate_ccw_hold` to Home Assistant, prompting `Turn ON Room?` or `Turn OFF Room?`.
+2. **Prompt Click Confirmation**: Short-clicking while a confirmation prompt (ending with `?`) is displayed fires `action: click`, triggering Home Assistant to execute the bulk power service across all included entities.
+3. **Hotspot & OTA Guarding**: While the `WIFI FAILED!` hotspot overlay or `UPDATING...` OTA screen is active, all encoder rotations and button events are blocked locally to prevent background state drift.
 
 ---
 
@@ -109,14 +117,18 @@ The settings menu is 100% locally rendered, decoupling critical device config fr
 
 ```mermaid
 flowchart LR
-    Enter[Hold >4s] --> Nav[Scroll Settings 0-9]
+    Enter[Hold >4s] --> Nav[Scroll Settings 0-10]
     Nav -->|Rotate| Nav
     Nav -->|Short Click| Eval[Evaluate Selection]
     
-    Eval -->|Index < 4| Edit[Toggle Edit Mode]
-    Edit -->|Rotate| AdjustVar[Change Variable]
-    AdjustVar -->|Short Click| EditExit[Save & Exit Edit]
+    Eval -->|Index < 4 or Index == 9| Edit[Toggle Edit Mode]
+    Edit -->|Rotate| AdjustVar[Change Variable / Demo Mode]
+    AdjustVar -->|Short Click| EditExit[Save & Exit Edit Mode]
     EditExit --> Nav
+    
+    Eval -->|Index 4, 5, 6, 7| Action[Toggle Guest / LeftHand / ChangePIN / WiFi Rescan]
+    Eval -->|Index 10| Exit[Exit Settings]
+```
     
     Eval -->|Index = 4 (Guest)| ToggleGuest[Toggle Guest]
     ToggleGuest -->|If ON| PINFlow
