@@ -371,13 +371,15 @@ binary_sensor:
     on_press:
       - script.stop: idle_timer
       - lambda: |-
+          if (id(wifi_component).is_ap_active() || id(ota_active)) return;
           id(press_time) = millis();
           id(processed_settings_hold) = false;
           id(processed_rotate_hold) = false;
-      - script.execute: handle_settings_hold
+          id(handle_settings_hold)->execute();
     on_release:
       - script.stop: handle_settings_hold
       - lambda: |-
+          if (id(wifi_component).is_ap_active() || id(ota_active)) return;
           // If we were asleep (screen off), wake up but ignore the click
           if (!id(is_awake)) {
               id(idle_timer)->execute(); // Turn on screen, set is_awake=true
@@ -681,6 +683,7 @@ sensor:
     on_clockwise:
       - script.execute: idle_timer
       - lambda: |-
+          if (id(wifi_component).is_ap_active() || id(ota_active)) return;
           if (id(demo_mode) && !id(settings_mode)) {
              id(handle_settings_hold)->stop();
              bool is_dimmable = false;
@@ -808,6 +811,7 @@ sensor:
     on_anticlockwise:
       - script.execute: idle_timer
       - lambda: |-
+          if (id(wifi_component).is_ap_active() || id(ota_active)) return;
           if (id(demo_mode) && !id(settings_mode)) {
              id(handle_settings_hold)->stop();
              bool is_dimmable = false;
@@ -1091,6 +1095,10 @@ display:
 
       // 00. CHECK FOR HOTSPOT MODE (WiFi Failure)
       if (id(wifi_component).is_ap_active()) {
+        id(settings_mode) = false;
+        id(edit_mode) = false;
+        id(guest_pin_mode) = false;
+        id(control_mode) = false;
         it.fill(id(my_color_black));
         it.print(64, 0, id(font_header), id(my_color_white), TextAlign::TOP_CENTER, "WIFI FAILED!");
         it.print(64, 16, id(font_small), id(my_color_white), TextAlign::TOP_CENTER, "Connect to Hotspot:");
