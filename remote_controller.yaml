@@ -415,7 +415,11 @@ binary_sensor:
             if (id(control_mode)) {
                 id(control_mode) = false;
                 id(last_control_exit) = millis();
-                id(send_refresh_event)->execute(); // Combined clear + refresh
+                if (id(remote_overlay).state.find("?") != std::string::npos) {
+                    id(send_click_event)->execute();
+                } else {
+                    id(send_refresh_event)->execute(); // Combined clear + refresh
+                }
                 id(my_display).update();
                 return;
             }
@@ -475,11 +479,6 @@ binary_sensor:
                  id(settings_mode) = false;
                  id(edit_mode) = false;
                  id(my_display).update();
-               } else if (id(settings_index) == 9) { // Demo Mode Toggle
-                  id(demo_mode) = !id(demo_mode);
-                  id(local_overlay_msg) = id(demo_mode) ? "Demo Mode: ON" : "Demo Mode: OFF";
-                  id(show_local_warning)->execute();
-                  id(my_display).update();
                } else if (id(settings_index) == 7) { // WiFi (Rescan Trigger)
                   id(settings_mode) = false;
                   id(my_display).update();
@@ -504,7 +503,7 @@ binary_sensor:
                     // IF OFF: Toggle freely
                     id(send_toggle_guest_event)->execute();
                  }
-               } else if (id(settings_index) < 4) { // Editable items (0,1,2,3)
+               } else if (id(settings_index) < 4 || id(settings_index) == 9) { // Editable items (0,1,2,3,9)
                  id(edit_mode) = !id(edit_mode);
                  id(my_display).update();
                }
@@ -728,14 +727,6 @@ sensor:
              return;
           }
           if (id(encoder_button).state) {
-            // Check if status contains '*' (dimmable)
-            std::string st = id(remote_line_3_status).state;
-            if (st.find("*") == std::string::npos) {
-                 id(processed_rotate_hold) = true;
-                 id(show_local_warning)->execute();
-                 return; // Not dimmable, show warning
-            }
-            
             id(processed_rotate_hold) = true;
             id(control_mode) = true;
             id(handle_settings_hold)->stop();
@@ -789,6 +780,9 @@ sensor:
 
                             id(enable_animations_v2) = (id(enable_animations_v2) == 1) ? 0 : 1;
                            changed = true;
+                        } else if (id(settings_index) == 9) { // Demo Mode
+                            id(demo_mode) = !id(demo_mode);
+                            changed = true;
                         }
                         if (changed) id(my_display).update();
                  else:
@@ -856,14 +850,6 @@ sensor:
              return;
           }
           if (id(encoder_button).state) {
-            // Check if status contains '*' (dimmable)
-            std::string st = id(remote_line_3_status).state;
-            if (st.find("*") == std::string::npos) {
-                 id(processed_rotate_hold) = true;
-                 id(show_local_warning)->execute();
-                 return; // Not dimmable, show warning
-            }
-            
             id(processed_rotate_hold) = true;
             id(control_mode) = true;
             id(handle_settings_hold)->stop();
@@ -917,6 +903,9 @@ sensor:
 
                            id(enable_animations_v2) = (id(enable_animations_v2) == 1) ? 0 : 1;
                            changed = true;
+                        } else if (id(settings_index) == 9) { // Demo Mode
+                            id(demo_mode) = !id(demo_mode);
+                            changed = true;
                         }
                         if (changed) id(my_display).update();
                  else:
@@ -1166,7 +1155,7 @@ display:
           int item_h = 16;
           
           for (int i = 0; i < 3; i++) { // Show 3 items centered around selection
-              int current_item = (id(settings_index) - 1 + i + 10) % 10;
+              int current_item = (id(settings_index) - 1 + i + 11) % 11;
               int draw_y = y_base + (i * item_h);
               
               auto text_col = id(my_color_white);
@@ -1220,7 +1209,10 @@ display:
                      it.print(x_pos, draw_y, current_font, text_col, align, "IP: N/A");
               }
               else if (current_item == 9) { // Demo Mode
-                  it.printf(x_pos, draw_y, current_font, text_col, align, "Demo: %s", id(demo_mode) ? "ON" : "OFF");
+                  if (id(edit_mode) && id(settings_index) == 9)
+                     it.printf(x_pos, draw_y, current_font, text_col, align, "Demo: [%s]", id(demo_mode) ? "ON" : "OFF");
+                  else
+                     it.printf(x_pos, draw_y, current_font, text_col, align, "Demo: %s", id(demo_mode) ? "ON" : "OFF");
               }
               else if (current_item == 10) { // Exit
                   it.print(x_pos, draw_y, current_font, text_col, align, "Exit");
