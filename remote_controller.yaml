@@ -4,7 +4,11 @@
 substitutions:
   name: "ha-remote"
   friendly_name: "HA Remote Controller"
-  fw_version: "v0.7.2"
+  version_major: "0"
+  version_minor: "7"
+  version_patch: "2"
+  version_prerelease: "-DEMO-MODE" # Set to "" for official releases, or "-rc.1", "-beta", etc.
+  fw_version: "v${version_major}.${version_minor}.${version_patch}${version_prerelease}"
 
 dashboard_import:
   package_import_url: github://orkanm/HARem/remote_controller.yaml
@@ -14,7 +18,7 @@ esphome:
   friendly_name: HARem
   project:
     name: "orkanm.harem"
-    version: "v0.7.2"
+    version: ${fw_version}
   on_boot:
     - priority: 800
       then:
@@ -233,6 +237,67 @@ globals:
     type: int
     restore_value: yes
     initial_value: '1'
+  - id: demo_mode
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
+  - id: demo_path
+    type: int
+    initial_value: '0'
+  - id: demo_index
+    type: int
+    initial_value: '0'
+  - id: demo_overlay
+    type: std::string
+    initial_value: '""'
+  - id: demo_overlay_time
+    type: uint32_t
+    initial_value: '0'
+  - id: demo_control_mode
+    type: bool
+    initial_value: 'false'
+  - id: demo_light1_pct
+    type: int
+    initial_value: '80'
+  - id: demo_speaker_pct
+    type: int
+    initial_value: '50'
+  - id: demo_lamp_on
+    type: bool
+    initial_value: 'true'
+  - id: demo_fan_on
+    type: bool
+    initial_value: 'false'
+  - id: demo_lock_state
+    type: bool
+    initial_value: 'true'
+  - id: demo_bed_light_pct
+    type: int
+    initial_value: '60'
+  - id: demo_ac_on
+    type: bool
+    initial_value: 'false'
+  - id: demo_bed_audio_pct
+    type: int
+    initial_value: '30'
+  - id: demo_coffee_on
+    type: bool
+    initial_value: 'false'
+  - id: demo_counter_light_pct
+    type: int
+    initial_value: '100'
+  - id: demo_kettle_on
+    type: bool
+    initial_value: 'false'
+  - id: demo_desk_light_pct
+    type: int
+    initial_value: '50'
+  - id: demo_lightbar_pct
+    type: int
+    initial_value: '80'
+  - id: demo_pc_on
+    type: bool
+    initial_value: 'true'
   - id: battery_percent
     type: float
     restore_value: yes
@@ -306,13 +371,15 @@ binary_sensor:
     on_press:
       - script.stop: idle_timer
       - lambda: |-
+          if (id(wifi_component).is_ap_active() || id(ota_active)) return;
           id(press_time) = millis();
           id(processed_settings_hold) = false;
           id(processed_rotate_hold) = false;
-      - script.execute: handle_settings_hold
+          id(handle_settings_hold)->execute();
     on_release:
       - script.stop: handle_settings_hold
       - lambda: |-
+          if (id(wifi_component).is_ap_active() || id(ota_active)) return;
           // If we were asleep (screen off), wake up but ignore the click
           if (!id(is_awake)) {
               id(idle_timer)->execute(); // Turn on screen, set is_awake=true
@@ -348,7 +415,11 @@ binary_sensor:
             if (id(control_mode)) {
                 id(control_mode) = false;
                 id(last_control_exit) = millis();
-                id(send_refresh_event)->execute(); // Combined clear + refresh
+                if (id(remote_overlay).state.find("?") != std::string::npos) {
+                    id(send_click_event)->execute();
+                } else {
+                    id(send_refresh_event)->execute(); // Combined clear + refresh
+                }
                 id(my_display).update();
                 return;
             }
@@ -404,7 +475,7 @@ binary_sensor:
                   return;
                }
 
-               if (id(settings_index) == 9) { // Exit
+               if (id(settings_index) == 10) { // Exit
                  id(settings_mode) = false;
                  id(edit_mode) = false;
                  id(my_display).update();
@@ -432,13 +503,103 @@ binary_sensor:
                     // IF OFF: Toggle freely
                     id(send_toggle_guest_event)->execute();
                  }
-               } else if (id(settings_index) < 4) { // Editable items (0,1,2,3)
+               } else if (id(settings_index) < 4 || id(settings_index) == 9) { // Editable items (0,1,2,3,9)
                  id(edit_mode) = !id(edit_mode);
                  id(my_display).update();
                }
             } else {
                if (id(is_awake)) {
-                 id(send_click_event)->execute();
+                 if (id(demo_mode)) {
+                    id(idle_timer)->execute();
+                    if (id(demo_control_mode) || id(demo_overlay).rfind("Bright", 0) == 0 || id(demo_overlay).rfind("Vol", 0) == 0) {
+                        id(demo_control_mode) = false;
+                        id(demo_overlay) = "";
+                    } else if (id(demo_overlay) != "") {
+                        if (id(demo_overlay) == "Turn ON Room?") {
+                            std::string r_name = (id(demo_index) == 0) ? "Living Room" : (id(demo_index) == 1 ? "Bedroom" : (id(demo_index) == 2 ? "Kitchen" : "Office"));
+                            id(demo_overlay) = r_name + " ON";
+                            id(demo_overlay_time) = millis();
+                        } else if (id(demo_overlay) == "Turn OFF Room?") {
+                            std::string r_name = (id(demo_index) == 0) ? "Living Room" : (id(demo_index) == 1 ? "Bedroom" : (id(demo_index) == 2 ? "Kitchen" : "Office"));
+                            id(demo_overlay) = r_name + " OFF";
+                            id(demo_overlay_time) = millis();
+                        } else {
+                            id(demo_overlay) = "";
+                        }
+                    } else {
+                        if (id(demo_path) == 0) {
+                            id(demo_path) = id(demo_index) + 1;
+                            id(demo_index) = 0;
+                        } else if (id(demo_path) == 1) { // Living Room
+                            if (id(demo_index) == 0) {
+                                if (id(demo_light1_pct) > 0) { id(demo_light1_pct) = 0; id(demo_overlay) = "Turning Off..."; }
+                                else { id(demo_light1_pct) = 80; id(demo_overlay) = "Turning On..."; }
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 1) {
+                                if (id(demo_speaker_pct) > 0) { id(demo_speaker_pct) = 0; id(demo_overlay) = "Pausing..."; }
+                                else { id(demo_speaker_pct) = 50; id(demo_overlay) = "Playing..."; }
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 2) {
+                                id(demo_lamp_on) = !id(demo_lamp_on);
+                                id(demo_overlay) = id(demo_lamp_on) ? "Turning On..." : "Turning Off...";
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 3) {
+                                id(demo_fan_on) = !id(demo_fan_on);
+                                id(demo_overlay) = id(demo_fan_on) ? "Turning On..." : "Turning Off...";
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 4) {
+                                id(demo_lock_state) = !id(demo_lock_state);
+                                id(demo_overlay) = id(demo_lock_state) ? "Locking..." : "Unlocking...";
+                                id(demo_overlay_time) = millis();
+                            }
+                        } else if (id(demo_path) == 2) { // Bedroom
+                            if (id(demo_index) == 0) {
+                                if (id(demo_bed_light_pct) > 0) { id(demo_bed_light_pct) = 0; id(demo_overlay) = "Turning Off..."; }
+                                else { id(demo_bed_light_pct) = 60; id(demo_overlay) = "Turning On..."; }
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 1) {
+                                id(demo_ac_on) = !id(demo_ac_on);
+                                id(demo_overlay) = id(demo_ac_on) ? "Turning On..." : "Turning Off...";
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 2) {
+                                if (id(demo_bed_audio_pct) > 0) { id(demo_bed_audio_pct) = 0; id(demo_overlay) = "Pausing..."; }
+                                else { id(demo_bed_audio_pct) = 30; id(demo_overlay) = "Playing..."; }
+                                id(demo_overlay_time) = millis();
+                            }
+                        } else if (id(demo_path) == 3) { // Kitchen
+                            if (id(demo_index) == 0) {
+                                id(demo_coffee_on) = !id(demo_coffee_on);
+                                id(demo_overlay) = id(demo_coffee_on) ? "Turning On..." : "Turning Off...";
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 1) {
+                                if (id(demo_counter_light_pct) > 0) { id(demo_counter_light_pct) = 0; id(demo_overlay) = "Turning Off..."; }
+                                else { id(demo_counter_light_pct) = 100; id(demo_overlay) = "Turning On..."; }
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 2) {
+                                id(demo_kettle_on) = !id(demo_kettle_on);
+                                id(demo_overlay) = id(demo_kettle_on) ? "Turning On..." : "Turning Off...";
+                                id(demo_overlay_time) = millis();
+                            }
+                        } else if (id(demo_path) == 4) { // Office
+                            if (id(demo_index) == 0) {
+                                if (id(demo_desk_light_pct) > 0) { id(demo_desk_light_pct) = 0; id(demo_overlay) = "Turning Off..."; }
+                                else { id(demo_desk_light_pct) = 50; id(demo_overlay) = "Turning On..."; }
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 1) {
+                                if (id(demo_lightbar_pct) > 0) { id(demo_lightbar_pct) = 0; id(demo_overlay) = "Turning Off..."; }
+                                else { id(demo_lightbar_pct) = 80; id(demo_overlay) = "Turning On..."; }
+                                id(demo_overlay_time) = millis();
+                            } else if (id(demo_index) == 2) {
+                                id(demo_pc_on) = !id(demo_pc_on);
+                                id(demo_overlay) = id(demo_pc_on) ? "Turning On..." : "Turning Off...";
+                                id(demo_overlay_time) = millis();
+                            }
+                        }
+                    }
+                    id(my_display).update();
+                 } else {
+                    id(send_click_event)->execute();
+                 }
                } else {
                  id(idle_timer)->execute();
                }
@@ -454,9 +615,20 @@ binary_sensor:
                    id(settings_mode) = false;
                    id(edit_mode) = false;
                }
-            } else {
-               id(send_back_event)->execute();
-            }
+             } else {
+                if (id(demo_mode)) {
+                   id(demo_control_mode) = false;
+                   if (id(demo_overlay) != "") {
+                       id(demo_overlay) = "";
+                   } else if (id(demo_path) != 0) {
+                       id(demo_path) = 0;
+                       id(demo_index) = 0;
+                   }
+                   id(my_display).update();
+                } else {
+                   id(send_back_event)->execute();
+                }
+             }
           }
 
 text_sensor:
@@ -510,15 +682,51 @@ sensor:
     on_clockwise:
       - script.execute: idle_timer
       - lambda: |-
-          if (id(encoder_button).state) {
-            // Check if status contains '*' (dimmable)
-            std::string st = id(remote_line_3_status).state;
-            if (st.find("*") == std::string::npos) {
+          if (id(wifi_component).is_ap_active() || id(ota_active)) return;
+          if (id(demo_mode) && !id(settings_mode)) {
+             id(handle_settings_hold)->stop();
+             bool is_dimmable = false;
+             bool is_speaker = false;
+             int *target_pct = nullptr;
+             if (id(demo_path) == 1) {
+                 if (id(demo_index) == 0) { is_dimmable = true; target_pct = &id(demo_light1_pct); }
+                 else if (id(demo_index) == 1) { is_dimmable = true; is_speaker = true; target_pct = &id(demo_speaker_pct); }
+             } else if (id(demo_path) == 2) {
+                 if (id(demo_index) == 0) { is_dimmable = true; target_pct = &id(demo_bed_light_pct); }
+                 else if (id(demo_index) == 2) { is_dimmable = true; is_speaker = true; target_pct = &id(demo_bed_audio_pct); }
+             } else if (id(demo_path) == 3) {
+                 if (id(demo_index) == 1) { is_dimmable = true; target_pct = &id(demo_counter_light_pct); }
+             } else if (id(demo_path) == 4) {
+                 if (id(demo_index) == 0) { is_dimmable = true; target_pct = &id(demo_desk_light_pct); }
+                 else if (id(demo_index) == 1) { is_dimmable = true; target_pct = &id(demo_lightbar_pct); }
+             }
+
+             if (id(encoder_button).state || id(demo_control_mode)) {
                  id(processed_rotate_hold) = true;
-                 id(show_local_warning)->execute();
-                 return; // Not dimmable, show warning
-            }
-            
+                 if (is_dimmable && target_pct != nullptr) {
+                     id(demo_control_mode) = true;
+                     *target_pct = std::min(100, *target_pct + 10);
+                     id(demo_overlay) = (is_speaker ? "Vol " : "Bright ") + std::to_string(*target_pct) + "%";
+                     id(demo_overlay_time) = millis();
+                 } else if (id(demo_path) == 0) {
+                     id(demo_overlay) = "Turn ON Room?";
+                     id(demo_overlay_time) = millis();
+                 } else {
+                     id(show_local_warning)->execute();
+                 }
+             } else {
+                 if (id(demo_overlay) == "Turn ON Room?" || id(demo_overlay) == "Turn OFF Room?") {
+                     id(demo_overlay) = (id(demo_overlay) == "Turn ON Room?") ? "Turn OFF Room?" : "Turn ON Room?";
+                     id(demo_overlay_time) = millis();
+                 } else {
+                     int total = (id(demo_path) == 0 || id(demo_path) == 1 || id(demo_path) == 5) ? 5 : 3;
+                     id(demo_index) = (id(demo_index) + 1) % total;
+                 }
+             }
+             id(my_display).update();
+             return;
+          }
+          if (id(encoder_button).state) {
             id(processed_rotate_hold) = true;
             id(control_mode) = true;
             id(handle_settings_hold)->stop();
@@ -570,17 +778,20 @@ sensor:
                            }
                         } else if (id(settings_index) == 3) { // Animations
 
-                           id(enable_animations_v2) = (id(enable_animations_v2) == 1) ? 0 : 1;
+                            id(enable_animations_v2) = (id(enable_animations_v2) == 1) ? 0 : 1;
                            changed = true;
+                        } else if (id(settings_index) == 9) { // Demo Mode
+                            id(demo_mode) = !id(demo_mode);
+                            changed = true;
                         }
                         if (changed) id(my_display).update();
                  else:
-                   # Move Down (Wrapped)
-                   - lambda: |-
-                       // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:Guest, 5:LeftHand, 6:ChangePIN, 7:WiFi, 8:IP, 9:Exit
-                       id(settings_index)++;
-                       if (id(settings_index) > 9) id(settings_index) = 0;
-                       id(my_display).update();
+                    # Move Down (Wrapped)
+                    - lambda: |-
+                        // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:Guest, 5:LeftHand, 6:ChangePIN, 7:WiFi, 8:IP, 9:Demo, 10:Exit
+                        id(settings_index)++;
+                        if (id(settings_index) > 10) id(settings_index) = 0;
+                        id(my_display).update();
           else:
             - if:
                 condition:
@@ -594,15 +805,51 @@ sensor:
     on_anticlockwise:
       - script.execute: idle_timer
       - lambda: |-
-          if (id(encoder_button).state) {
-            // Check if status contains '*' (dimmable)
-            std::string st = id(remote_line_3_status).state;
-            if (st.find("*") == std::string::npos) {
+          if (id(wifi_component).is_ap_active() || id(ota_active)) return;
+          if (id(demo_mode) && !id(settings_mode)) {
+             id(handle_settings_hold)->stop();
+             bool is_dimmable = false;
+             bool is_speaker = false;
+             int *target_pct = nullptr;
+             if (id(demo_path) == 1) {
+                 if (id(demo_index) == 0) { is_dimmable = true; target_pct = &id(demo_light1_pct); }
+                 else if (id(demo_index) == 1) { is_dimmable = true; is_speaker = true; target_pct = &id(demo_speaker_pct); }
+             } else if (id(demo_path) == 2) {
+                 if (id(demo_index) == 0) { is_dimmable = true; target_pct = &id(demo_bed_light_pct); }
+                 else if (id(demo_index) == 2) { is_dimmable = true; is_speaker = true; target_pct = &id(demo_bed_audio_pct); }
+             } else if (id(demo_path) == 3) {
+                 if (id(demo_index) == 1) { is_dimmable = true; target_pct = &id(demo_counter_light_pct); }
+             } else if (id(demo_path) == 4) {
+                 if (id(demo_index) == 0) { is_dimmable = true; target_pct = &id(demo_desk_light_pct); }
+                 else if (id(demo_index) == 1) { is_dimmable = true; target_pct = &id(demo_lightbar_pct); }
+             }
+
+             if (id(encoder_button).state || id(demo_control_mode)) {
                  id(processed_rotate_hold) = true;
-                 id(show_local_warning)->execute();
-                 return; // Not dimmable, show warning
-            }
-            
+                 if (is_dimmable && target_pct != nullptr) {
+                     id(demo_control_mode) = true;
+                     *target_pct = std::max(0, *target_pct - 10);
+                     id(demo_overlay) = (is_speaker ? "Vol " : "Bright ") + std::to_string(*target_pct) + "%";
+                     id(demo_overlay_time) = millis();
+                 } else if (id(demo_path) == 0) {
+                     id(demo_overlay) = "Turn OFF Room?";
+                     id(demo_overlay_time) = millis();
+                 } else {
+                     id(show_local_warning)->execute();
+                 }
+             } else {
+                 if (id(demo_overlay) == "Turn ON Room?" || id(demo_overlay) == "Turn OFF Room?") {
+                     id(demo_overlay) = (id(demo_overlay) == "Turn ON Room?") ? "Turn OFF Room?" : "Turn ON Room?";
+                     id(demo_overlay_time) = millis();
+                 } else {
+                     int total = (id(demo_path) == 0 || id(demo_path) == 1 || id(demo_path) == 5) ? 5 : 3;
+                     id(demo_index) = (id(demo_index) - 1 + total) % total;
+                 }
+             }
+             id(my_display).update();
+             return;
+          }
+          if (id(encoder_button).state) {
             id(processed_rotate_hold) = true;
             id(control_mode) = true;
             id(handle_settings_hold)->stop();
@@ -656,18 +903,21 @@ sensor:
 
                            id(enable_animations_v2) = (id(enable_animations_v2) == 1) ? 0 : 1;
                            changed = true;
+                        } else if (id(settings_index) == 9) { // Demo Mode
+                            id(demo_mode) = !id(demo_mode);
+                            changed = true;
                         }
                         if (changed) id(my_display).update();
                  else:
-                   # Move Up (Wrapped)
-                   - lambda: |-
-                       // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:Guest, 5:LeftHand, 6:ChangePIN, 7:WiFi, 8:IP, 9:Exit
-                       if (id(settings_index) == 0) {
-                           id(settings_index) = 9;
-                       } else {
-                           id(settings_index)--;
-                       }
-                       id(my_display).update();
+                    # Move Up (Wrapped)
+                    - lambda: |-
+                        // 0:Bright, 1:Standby, 2:Sleep, 3:Animations, 4:Guest, 5:LeftHand, 6:ChangePIN, 7:WiFi, 8:IP, 9:Demo, 10:Exit
+                        if (id(settings_index) == 0) {
+                            id(settings_index) = 10;
+                        } else {
+                            id(settings_index)--;
+                        }
+                        id(my_display).update();
           else:
             - if:
                 condition:
@@ -834,6 +1084,10 @@ display:
 
       // 00. CHECK FOR HOTSPOT MODE (WiFi Failure)
       if (id(wifi_component).is_ap_active()) {
+        id(settings_mode) = false;
+        id(edit_mode) = false;
+        id(guest_pin_mode) = false;
+        id(control_mode) = false;
         it.fill(id(my_color_black));
         it.print(64, 0, id(font_header), id(my_color_white), TextAlign::TOP_CENTER, "WIFI FAILED!");
         it.print(64, 16, id(font_small), id(my_color_white), TextAlign::TOP_CENTER, "Connect to Hotspot:");
@@ -901,7 +1155,7 @@ display:
           int item_h = 16;
           
           for (int i = 0; i < 3; i++) { // Show 3 items centered around selection
-              int current_item = (id(settings_index) - 1 + i + 10) % 10;
+              int current_item = (id(settings_index) - 1 + i + 11) % 11;
               int draw_y = y_base + (i * item_h);
               
               auto text_col = id(my_color_white);
@@ -954,7 +1208,13 @@ display:
                   else
                      it.print(x_pos, draw_y, current_font, text_col, align, "IP: N/A");
               }
-              else if (current_item == 9) { // Exit
+              else if (current_item == 9) { // Demo Mode
+                  if (id(edit_mode) && id(settings_index) == 9)
+                     it.printf(x_pos, draw_y, current_font, text_col, align, "Demo: [%s]", id(demo_mode) ? "ON" : "OFF");
+                  else
+                     it.printf(x_pos, draw_y, current_font, text_col, align, "Demo: %s", id(demo_mode) ? "ON" : "OFF");
+              }
+              else if (current_item == 10) { // Exit
                   it.print(x_pos, draw_y, current_font, text_col, align, "Exit");
               }
           }
@@ -966,6 +1226,103 @@ display:
       else if (id(local_overlay_msg) != "") {
          it.fill(id(my_color_black));
          it.print(64, 32, id(font_header), TextAlign::CENTER, id(local_overlay_msg).c_str());
+      }
+
+      // 00E. STANDALONE DEMO MODE ENGINE
+      else if (id(demo_mode)) {
+          // Check 5-second inactivity timeout for demo overlay
+          if (id(demo_overlay) != "" && (millis() - id(demo_overlay_time) > 5000)) {
+              id(demo_overlay) = "";
+              id(demo_control_mode) = false;
+          }
+
+          if (id(demo_overlay) != "") {
+              it.fill(id(my_color_black));
+              it.print(64, 25, id(font_header), TextAlign::TOP_CENTER, id(demo_overlay).c_str());
+          } else {
+              struct DemoItem { std::string name; std::string status; };
+              std::vector<DemoItem> items;
+              int p = id(demo_path);
+              if (p == 0) { // ROOT
+                  items = {{"Living Room", "(room)"}, {"Bedroom", "(room)"}, {"Kitchen", "(room)"}, {"Office", "(room)"}, {"HARem Specs", ""}};
+              } else if (p == 1) { // Living Room
+                  items = {
+                      {"Ceiling Light", id(demo_light1_pct) > 0 ? ("(" + std::to_string(id(demo_light1_pct)) + "%) *") : "(off) *"},
+                      {"TV Speaker", id(demo_speaker_pct) > 0 ? ("(" + std::to_string(id(demo_speaker_pct)) + "%) *") : "(off) *"},
+                      {"Floor Lamp", id(demo_lamp_on) ? "(on)" : "(off)"},
+                      {"Standing Fan", id(demo_fan_on) ? "(on)" : "(off)"},
+                      {"Front Door", id(demo_lock_state) ? "(locked)" : "(unlocked)"}
+                  };
+              } else if (p == 2) { // Bedroom
+                  items = {
+                      {"Nightstand Light", id(demo_bed_light_pct) > 0 ? ("(" + std::to_string(id(demo_bed_light_pct)) + "%) *") : "(off) *"},
+                      {"Air Conditioner", id(demo_ac_on) ? "(on)" : "(off)"},
+                      {"Bedside Audio", id(demo_bed_audio_pct) > 0 ? ("(" + std::to_string(id(demo_bed_audio_pct)) + "%) *") : "(off) *"}
+                  };
+              } else if (p == 3) { // Kitchen
+                  items = {
+                      {"Coffee Maker", id(demo_coffee_on) ? "(on)" : "(off)"},
+                      {"Counter Light", id(demo_counter_light_pct) > 0 ? ("(" + std::to_string(id(demo_counter_light_pct)) + "%) *") : "(off) *"},
+                      {"Smart Kettle", id(demo_kettle_on) ? "(on)" : "(off)"}
+                  };
+              } else if (p == 4) { // Office
+                  items = {
+                      {"Desk Lamp", id(demo_desk_light_pct) > 0 ? ("(" + std::to_string(id(demo_desk_light_pct)) + "%) *") : "(off) *"},
+                      {"Monitor Lightbar", id(demo_lightbar_pct) > 0 ? ("(" + std::to_string(id(demo_lightbar_pct)) + "%) *") : "(off) *"},
+                      {"Workstation PC", id(demo_pc_on) ? "(on)" : "(off)"}
+                  };
+              } else { // HARem Specs
+                  items = {
+                      {"MCU: ESP32-C3 RISC-V", ""},
+                      {"Display: OLED 128x64", ""},
+                      {"Control: Rotary Encoder", ""},
+                      {"Power: LiPo + ADC Cal", ""},
+                      {"OS: ESPHome (ESP-IDF)", ""}
+                  };
+              }
+
+              int total = items.size();
+              int idx = id(demo_index) % total;
+
+              // Draw Top Header
+              it.print(6, 0, id(font_tiny), id(my_color_white), TextAlign::TOP_LEFT, "DEMO");
+              if (p == 5) {
+                  it.print(64, 0, id(font_small), id(my_color_white), TextAlign::TOP_CENTER, "HAREM SPECS");
+              } else {
+                  std::string p_name = (p == 0) ? "ROOT" : (p == 1 ? "Living Room" : (p == 2 ? "Bedroom" : (p == 3 ? "Kitchen" : "Office")));
+                  it.print(64, 0, id(font_tiny), id(my_color_white), TextAlign::TOP_CENTER, p_name.c_str());
+              }
+              it.printf(127, 0, id(font_tiny), id(my_color_white), TextAlign::TOP_RIGHT, "%.0f%%", id(battery_percent));
+
+              // Draw 5 Menu Lines
+              int y_coords[5] = {6, 17, 29, 44, 54};
+              for (int i = 0; i < 5; i++) {
+                  int item_i = (idx - 2 + i + total * 10) % total;
+                  if (total < 5 && (idx - 2 + i < 0 || idx - 2 + i >= total)) continue;
+                  
+                  if (i == 2) {
+                      // Selected Line 3
+                      std::string st = items[item_i].status;
+                      size_t star_pos = st.find(" *");
+                      if (star_pos != std::string::npos) st = st.substr(0, star_pos);
+                      
+                      it.print(10, 29, id(font_small), id(my_color_white), TextAlign::TOP_LEFT, items[item_i].name.c_str());
+                      if (st != "") {
+                          it.print(124, 29, id(font_small), id(my_color_white), TextAlign::TOP_RIGHT, st.c_str());
+                      }
+                  } else {
+                      it.print(10, y_coords[i], id(font_small), id(my_color_white), TextAlign::TOP_LEFT, items[item_i].name.c_str());
+                  }
+              }
+
+              // Draw Selection Outline around Line 3
+              it.rectangle(8, 28, 120, 14, id(my_color_white));
+
+              // Draw Scrollbar Thumb
+              int thumb_h = 10;
+              int thumb_y = (total > 1) ? (int)(((float)idx / (total - 1)) * (64 - thumb_h)) : 0;
+              it.filled_rectangle(0, thumb_y, 5, thumb_h, id(my_color_white));
+          }
       }
 
       else if (id(remote_overlay).has_state() && id(remote_overlay).state != "") {
@@ -1079,7 +1436,7 @@ display:
           // 4. Draw Scroll Thumb (Location Indicator)
           if (id(settings_mode)) {
               int thumb_h = 12;
-              int thumb_y = 15 + (id(settings_index) * (48 - thumb_h) / 9);
+              int thumb_y = 15 + (id(settings_index) * (48 - thumb_h) / 10);
               it.filled_rectangle(0, thumb_y, 5, thumb_h, id(my_color_white));
           } else {
               // Ensure we have a valid total, even if HA is slow to update
