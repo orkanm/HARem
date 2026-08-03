@@ -79,9 +79,15 @@ blueprint:
         entity:
           multiple: true
 
-  
-
 mode: restart
+
+# YAML anchor definitions (anchor names are YAML-level and will be expanded where used)
+# clear_overlay anchor used to reduce duplication of the exact 'clear overlay' service call
+x_anchors:
+  clear_overlay: &clear_overlay
+    service: input_text.set_value
+    target: { entity_id: !input overlay }
+    data: { value: "" }
 
 trigger:
   - platform: event
@@ -93,12 +99,12 @@ action:
       action: "{{ trigger.event.data.action }}"
       path_entity: !input menu_path
       idx_entity: !input menu_index
-      path: "{{ states(path_entity) }}" 
+      path: "{{ states(path_entity) | default('') }}"
       idx: "{{ states(idx_entity) | int }}"
       guest_switch_entity: !input guest_mode_switch
       guest_ents_raw: !input guest_included_entities
       bulk_ents_raw: !input bulk_included_entities
-      
+
   - variables:
       guest_ents: >
         {% if guest_ents_raw is string %}
@@ -169,50 +175,42 @@ action:
       # ROTATE -> Change Index
       - conditions: "{{ action == 'next' and list_size > 0 }}"
         sequence:
-          - service: input_text.set_value
-            target: {entity_id: !input overlay}
-            data: {value: ""}
+          - *clear_overlay
           - service: input_number.set_value
-            target: {entity_id: !input menu_index}
-            data: {value: "{{ (idx + 1) % list_size }}"}
-            
+            target: { entity_id: !input menu_index }
+            data: { value: "{{ (idx + 1) % list_size }}" }
+
       - conditions: "{{ action == 'prev' and list_size > 0 }}"
         sequence:
-          - service: input_text.set_value
-            target: {entity_id: !input overlay}
-            data: {value: ""}
+          - *clear_overlay
           - service: input_number.set_value
-            target: {entity_id: !input menu_index}
-            data: {value: "{{ (idx - 1) % list_size }}"}
+            target: { entity_id: !input menu_index }
+            data: { value: "{{ (idx - 1) % list_size }}" }
 
       # NEW: Handle toggle_guest from remote settings
       - conditions: "{{ action == 'toggle_guest' }}"
         sequence:
           - service: input_boolean.toggle
-            target: {entity_id: !input guest_mode_switch}
+            target: { entity_id: !input guest_mode_switch }
           # Force nav back to ROOT to avoid being stuck in a restricted room
           - service: input_text.set_value
-            target: {entity_id: !input menu_path}
-            data: {value: "ROOT"}
+            target: { entity_id: !input menu_path }
+            data: { value: "ROOT" }
           - service: input_number.set_value
-            target: {entity_id: !input menu_index}
-            data: {value: 0}
+            target: { entity_id: !input menu_index }
+            data: { value: 0 }
           - variables:
               new_state: "{{ 'ON' if is_state(guest_switch_entity, 'on') else 'OFF' }}"
           - service: input_text.set_value
-            target: {entity_id: !input overlay}
-            data: {value: "Guest Mode: {{ new_state }}"}
+            target: { entity_id: !input overlay }
+            data: { value: "Guest Mode: {{ new_state }}" }
           - delay: "00:00:02"
-          - service: input_text.set_value
-            target: {entity_id: !input overlay}
-            data: {value: ""}
+          - *clear_overlay
 
       # REFRESH -> Explicitly Redraw Screen
       - conditions: "{{ action == 'refresh' }}"
         sequence:
-          - service: input_text.set_value
-            target: {entity_id: !input overlay}
-            data: {value: ""}
+          - *clear_overlay
           # The automation will now continue to the "UPDATE DISPLAY" section below
 
       # CLICK -> Enter/Toggle, Confirm Bulk Action, or Dismiss Active Feedback Overlay
@@ -220,7 +218,7 @@ action:
         sequence:
           - variables:
               ov_entity: !input overlay
-              current_ov: "{{ states(ov_entity) }}"
+              current_ov: "{{ states(ov_entity) | default('') }}"
 
           - choose:
               # 1. CONFIRM BULK TURN ON (when prompt active on ROOT)
@@ -229,6 +227,7 @@ action:
                   - variables:
                       gm: "{{ guest_switch_entity }}"
                       is_guest: "{{ is_state(gm, 'on') if gm != 'none' else false }}"
+                      # build list safely (no to_json)
                       areas_list: >
                         {% if is_guest %}
                            {% set ns = namespace(areas=[]) %}
@@ -238,13 +237,19 @@ action:
                                {% set ns.areas = ns.areas + [a] %}
                              {% endif %}
                            {% endfor %}
-                           {{ ns.areas | sort | to_json }}
+                           {{ ns.areas }}
                         {% else %}
-                           {{ areas() | sort | to_json }}
+                           {{ areas() | sort }}
                         {% endif %}
-                      selected_area: "{{ areas_list[idx % areas_list | length] if (areas_list is defined and areas_list | length > 0) else '' }}"
+                      selected_area: >
+                        {% set arr = areas_list %}
+                        {% if arr is iterable and arr | length > 0 %}
+                          {{ arr[idx % (arr | length)] }}
+                        {% else %}
+                          ''
+                        {% endif %}
                       selected_area_name: "{{ area_name(selected_area) or selected_area }}"
-                      raw_area_ents: "{{ area_entities(selected_area) | reject('is_hidden_entity') | list if selected_area != '' else [] }}"
+                      raw_area_ents: "{{ (area_entities(selected_area) | reject('is_hidden_entity') | list) if selected_area != '' else [] }}"
                       target_bulk_ents: >
                         {% set allowed = raw_area_ents | select('in', bulk_ents) | list %}
                         {% if is_guest %}
@@ -255,19 +260,17 @@ action:
                       - conditions: "{{ target_bulk_ents != '' }}"
                         sequence:
                           - service: input_text.set_value
-                            target: {entity_id: !input overlay}
-                            data: {value: "{{ selected_area_name }} ON"}
+                            target: { entity_id: !input overlay }
+                            data: { value: "{{ selected_area_name }} ON" }
                           - service: homeassistant.turn_on
-                            target: {entity_id: "{{ target_bulk_ents.split(',') }}"}
+                            target: { entity_id: "{{ target_bulk_ents.split(',') }}" }
                             continue_on_error: true
                     default:
                       - service: input_text.set_value
-                        target: {entity_id: !input overlay}
-                        data: {value: "No Bulk Devices"}
+                        target: { entity_id: !input overlay }
+                        data: { value: "No Bulk Devices" }
                   - delay: "00:00:01.5"
-                  - service: input_text.set_value
-                    target: {entity_id: !input overlay}
-                    data: {value: ""}
+                  - *clear_overlay
 
               # 2. CONFIRM BULK TURN OFF (when prompt active on ROOT)
               - conditions: "{{ (path == 'ROOT' or path == '') and current_ov == 'Turn OFF Room?' }}"
@@ -284,13 +287,19 @@ action:
                                {% set ns.areas = ns.areas + [a] %}
                              {% endif %}
                            {% endfor %}
-                           {{ ns.areas | sort | to_json }}
+                           {{ ns.areas }}
                         {% else %}
-                           {{ areas() | sort | to_json }}
+                           {{ areas() | sort }}
                         {% endif %}
-                      selected_area: "{{ areas_list[idx % areas_list | length] if (areas_list is defined and areas_list | length > 0) else '' }}"
+                      selected_area: >
+                        {% set arr = areas_list %}
+                        {% if arr is iterable and arr | length > 0 %}
+                          {{ arr[idx % (arr | length)] }}
+                        {% else %}
+                          ''
+                        {% endif %}
                       selected_area_name: "{{ area_name(selected_area) or selected_area }}"
-                      raw_area_ents: "{{ area_entities(selected_area) | reject('is_hidden_entity') | list if selected_area != '' else [] }}"
+                      raw_area_ents: "{{ (area_entities(selected_area) | reject('is_hidden_entity') | list) if selected_area != '' else [] }}"
                       target_bulk_ents: >
                         {% set allowed = raw_area_ents | select('in', bulk_ents) | list %}
                         {% if is_guest %}
@@ -301,26 +310,22 @@ action:
                       - conditions: "{{ target_bulk_ents != '' }}"
                         sequence:
                           - service: input_text.set_value
-                            target: {entity_id: !input overlay}
-                            data: {value: "{{ selected_area_name }} OFF"}
+                            target: { entity_id: !input overlay }
+                            data: { value: "{{ selected_area_name }} OFF" }
                           - service: homeassistant.turn_off
-                            target: {entity_id: "{{ target_bulk_ents.split(',') }}"}
+                            target: { entity_id: "{{ target_bulk_ents.split(',') }}" }
                             continue_on_error: true
                     default:
                       - service: input_text.set_value
-                        target: {entity_id: !input overlay}
-                        data: {value: "No Bulk Devices"}
+                        target: { entity_id: !input overlay }
+                        data: { value: "No Bulk Devices" }
                   - delay: "00:00:01.5"
-                  - service: input_text.set_value
-                    target: {entity_id: !input overlay}
-                    data: {value: ""}
+                  - *clear_overlay
 
               # 3. DISMISS ACTIVE FEEDBACK OVERLAY (If any non-prompt overlay is currently active)
               - conditions: "{{ current_ov != '' and current_ov != ' ' }}"
                 sequence:
-                  - service: input_text.set_value
-                    target: {entity_id: !input overlay}
-                    data: {value: ""}
+                  - *clear_overlay
 
             # 4. NORMAL CLICK (No overlay active)
             default:
@@ -338,17 +343,23 @@ action:
                                {% set ns.areas = ns.areas + [a] %}
                              {% endif %}
                            {% endfor %}
-                           {{ ns.areas | sort | to_json }}
+                           {{ ns.areas | sort }}
                         {% else %}
-                           {{ areas() | sort | to_json }}
+                           {{ areas() | sort }}
                         {% endif %}
-                      selected_area: "{{ areas_list[idx % areas_list | length] if (areas_list is defined and areas_list | length > 0) else '' }}"
+                      selected_area: >
+                        {% set arr = areas_list %}
+                        {% if arr is iterable and arr | length > 0 %}
+                          {{ arr[idx % (arr | length)] }}
+                        {% else %}
+                          ''
+                        {% endif %}
                   - service: input_text.set_value
-                    target: {entity_id: !input menu_path}
-                    data: {value: "{{ selected_area }}"}
+                    target: { entity_id: !input menu_path }
+                    data: { value: "{{ selected_area }}" }
                   - service: input_number.set_value
-                    target: {entity_id: !input menu_index}
-                    data: {value: 0}
+                    target: { entity_id: !input menu_index }
+                    data: { value: 0 }
                 else:
                   - variables:
                       gm: "{{ guest_switch_entity }}"
@@ -399,19 +410,19 @@ action:
 
                   # 1. Show Feedback Logic (Overlay)
                   - service: input_text.set_value
-                    target: {entity_id: !input overlay}
-                    data: {value: "{{ new_message }}"}
+                    target: { entity_id: !input overlay }
+                    data: { value: "{{ new_message }}" }
 
                   # 2. Perform Action
                   - choose:
                       - conditions: "{{ current_state == 'on' or current_state == 'playing' }}"
                         sequence:
                           - service: homeassistant.turn_off
-                            target: {entity_id: "{{ selected_entity }}"}
+                            target: { entity_id: "{{ selected_entity }}" }
                             continue_on_error: true
                     default:
                       - service: homeassistant.turn_on
-                        target: {entity_id: "{{ selected_entity }}"}
+                        target: { entity_id: "{{ selected_entity }}" }
                         continue_on_error: true
 
                   # 3. Wait for State Change (skipped for instant entities)
@@ -422,16 +433,14 @@ action:
                       - if: "{{ not wait.completed }}"
                         then:
                           - service: input_text.set_value
-                            target: {entity_id: !input overlay}
-                            data: {value: "Failed!"}
+                            target: { entity_id: !input overlay }
+                            data: { value: "Failed!" }
                           - delay: "00:00:02"
                     else:
                       - delay: "00:00:01"
 
                   # 4. Clear Overlay
-                  - service: input_text.set_value
-                    target: {entity_id: !input overlay}
-                    data: {value: ""}
+                  - *clear_overlay
 
       # ROTATE HOLD ON ROOM -> Ask Confirmation for Bulk Room Power Control
       - conditions: "{{ (action == 'rotate_cw_hold' or action == 'rotate_ccw_hold') and (path == 'ROOT' or path == '') }}"
@@ -448,12 +457,18 @@ action:
                        {% set ns.areas = ns.areas + [a] %}
                      {% endif %}
                    {% endfor %}
-                   {{ ns.areas | sort | to_json }}
+                   {{ ns.areas | sort }}
                 {% else %}
-                   {{ areas() | sort | to_json }}
+                   {{ areas() | sort }}
                 {% endif %}
-              target_area: "{{ areas_list[idx % areas_list | length] if (areas_list is defined and areas_list | length > 0) else '' }}"
-              raw_area_ents: "{{ area_entities(target_area) | reject('is_hidden_entity') | list if target_area != '' else [] }}"
+              target_area: >
+                {% set arr = areas_list %}
+                {% if arr is iterable and arr | length > 0 %}
+                  {{ arr[idx % (arr | length)] }}
+                {% else %}
+                  ''
+                {% endif %}
+              raw_area_ents: "{{ (area_entities(target_area) | reject('is_hidden_entity') | list) if target_area != '' else [] }}"
               target_bulk_ents: >
                 {% set allowed = raw_area_ents | select('in', bulk_ents) | list %}
                 {% if is_guest %}
@@ -467,25 +482,21 @@ action:
               - conditions: "{{ target_bulk_ents != '' }}"
                 sequence:
                   - service: input_text.set_value
-                    target: {entity_id: !input overlay}
+                    target: { entity_id: !input overlay }
                     data:
                       value: >-
                         {% if is_on %}Turn ON Room?{% else %}Turn OFF Room?{% endif %}
                   - delay: "00:00:05"
                   - if: "{{ is_state(ov_entity, 'Turn ON Room?') or is_state(ov_entity, 'Turn OFF Room?') }}"
                     then:
-                      - service: input_text.set_value
-                        target: {entity_id: !input overlay}
-                        data: {value: ""}
+                      - *clear_overlay
             default:
               - service: input_text.set_value
-                target: {entity_id: !input overlay}
+                target: { entity_id: !input overlay }
                 data:
                   value: "No Bulk Devices"
               - delay: "00:00:01.5"
-              - service: input_text.set_value
-                target: {entity_id: !input overlay}
-                data: {value: ""}
+              - *clear_overlay
 
       # ROTATE HOLD -> Brightness / Volume Control
       - conditions: "{{ (action == 'rotate_cw_hold' or action == 'rotate_ccw_hold') and path != 'ROOT' and path != '' }}"
@@ -535,17 +546,21 @@ action:
               grid: "{{ step | int | abs }}"
               line_3_status_ent: !input line_3_status
               current_pct: >
-                 {% set val = states(line_3_status_ent) %}
+                 {% set val = states(line_3_status_ent) | default('') %}
                  {% set is_off = val.startswith('(off)') %}
                  {% set numbers = val | regex_findall('\\((\\d+)%\\)') %}
-                 {% set stored = 0 if is_off else (numbers[0] | int(-1) if (numbers is defined and numbers | length > 0) else -1) %}
+                 {% if numbers | length > 0 %}
+                   {% set stored = numbers[0] | int %}
+                 {% else %}
+                   {% set stored = -1 %}
+                 {% endif %}
                  {% if stored >= 0 %}
                    {{ stored }}
                  {% elif domain == 'light' %}
                    {% set raw_pct = (state_attr(selected_entity, 'brightness') | int(0) / 2.55) %}
                    {{ ((raw_pct / grid) | round(0) * grid) | int }}
                  {% elif domain == 'media_player' %}
-                   {% set raw_pct = state_attr(selected_entity, 'volume_level') | float(0) * 100 %}
+                   {% set raw_pct = (state_attr(selected_entity, 'volume_level') | float(0) * 100) %}
                    {{ ((raw_pct / grid) | round(0) * grid) | int }}
                  {% else %} 0 {% endif %}
               new_pct: >-
@@ -613,46 +628,40 @@ action:
 
           - delay: 0.05
           - delay: "00:00:05"
-          - service: input_text.set_value
-            target: {entity_id: !input overlay}
-            data: {value: ""}
+          - *clear_overlay
 
       # BACK -> Dismiss Active Overlay or Exit Room to ROOT
       - conditions: "{{ action == 'back' }}"
         sequence:
           - variables:
               ov_entity: !input overlay
-              current_ov: "{{ states(ov_entity) }}"
+              current_ov: "{{ states(ov_entity) | default('') }}"
           - choose:
               # 1. If overlay active, ONLY dismiss overlay (stay in current room/view)
               - conditions: "{{ current_ov != '' and current_ov != ' ' }}"
                 sequence:
-                  - service: input_text.set_value
-                    target: {entity_id: !input overlay}
-                    data: {value: ""}
+                  - *clear_overlay
             # 2. If NO overlay active, exit room to ROOT
             default:
-              - service: input_text.set_value
-                target: {entity_id: !input overlay}
-                data: {value: ""}
+              - *clear_overlay
               - if: "{{ path != 'ROOT' and path != '' }}"
                 then:
                   - variables:
                       sorted_areas: "{{ areas() | sort }}"
                       restore_idx: "{{ sorted_areas.index(path) if path in sorted_areas else 0 }}"
                   - service: input_number.set_value
-                    target: {entity_id: !input menu_index}
-                    data: {value: "{{ restore_idx }}"}
+                    target: { entity_id: !input menu_index }
+                    data: { value: "{{ restore_idx }}" }
                   - service: input_text.set_value
-                    target: {entity_id: !input menu_path}
-                    data: {value: "ROOT"}
+                    target: { entity_id: !input menu_path }
+                    data: { value: "ROOT" }
 
   # 2. UPDATE DISPLAY (skip for rotation — overlay is shown, line_5 is the pct tracker)
   - if: "{{ action not in ['rotate_cw_hold', 'rotate_ccw_hold'] }}"
     then:
       - delay: { milliseconds: 100 }
       - variables:
-          path: "{{ states(path_entity) }}" 
+          path: "{{ states(path_entity) | default('') }}"
           idx: "{{ states(idx_entity) | int }}"
           guest_ents: !input guest_included_entities
           menu_total_ent: !input menu_total
@@ -662,8 +671,8 @@ action:
       - if: "{{ menu_total_ent != 'none' }}"
         then:
           - service: input_number.set_value
-            target: {entity_id: !input menu_total}
-            data: {value: "{{ list_size_val }}"}
+            target: { entity_id: !input menu_total }
+            data: { value: "{{ list_size_val }}" }
 
       - if: "{{ path == 'ROOT' or path == '' }}"
         then:
@@ -679,22 +688,23 @@ action:
                        {% set ns.areas = ns.areas + [a] %}
                      {% endif %}
                    {% endfor %}
-                   {{ ns.areas | sort | to_json }}
+                   {{ ns.areas | sort }}
                 {% else %}
-                   {{ areas() | sort | to_json }}
+                   {{ areas() | sort }}
                 {% endif %}
           - if: "{{ list | length > 0 }}"
             then:
               - service: input_text.set_value
-                target: {entity_id: !input line_1}
+                target: { entity_id: !input line_1 }
                 data:
                   value: >-
-                    {% if list|length >= 5 %}
-                      {{ area_name(list[(idx - 2) % list|length]) or '' }}
+                    {% set arr = list %}
+                    {% if arr | length >= 5 %}
+                      {{ area_name(arr[(idx - 2) % (arr | length)]) or '' }}
                     {% else %}
                       {% set target = idx - 2 %}
                       {% if target >= 0 %}
-                        {% for item in list %}
+                        {% for item in arr %}
                           {%- if loop.index0 == target -%}
                             {{ area_name(item) or '' }}
                           {%- endif -%}
@@ -702,15 +712,16 @@ action:
                       {% endif %}
                     {% endif %}
               - service: input_text.set_value
-                target: {entity_id: !input line_2}
+                target: { entity_id: !input line_2 }
                 data:
                   value: >-
-                    {% if list|length >= 5 %}
-                      {{ area_name(list[(idx - 1) % list|length]) or '' }}
+                    {% set arr = list %}
+                    {% if arr | length >= 5 %}
+                      {{ area_name(arr[(idx - 1) % (arr | length)]) or '' }}
                     {% else %}
                       {% set target = idx - 1 %}
                       {% if target >= 0 %}
-                        {% for item in list %}
+                        {% for item in arr %}
                           {%- if loop.index0 == target -%}
                             {{ area_name(item) or '' }}
                           {%- endif -%}
@@ -718,44 +729,47 @@ action:
                       {% endif %}
                     {% endif %}
               - service: input_text.set_value
-                target: {entity_id: !input line_3}
+                target: { entity_id: !input line_3 }
                 data:
                   value: >-
-                    {% if list|length >= 5 %}
-                      {{ area_name(list[idx % list|length]) or '' }}
+                    {% set arr = list %}
+                    {% if arr | length >= 5 %}
+                      {{ area_name(arr[idx % (arr | length)]) or '' }}
                     {% else %}
-                      {% for item in list %}
+                      {% for item in arr %}
                         {%- if loop.index0 == idx -%}
                           {{ area_name(item) or '' }}
                         {%- endif -%}
                       {% endfor %}
                     {% endif %}
               - service: input_text.set_value
-                target: {entity_id: !input line_3_status}
-                data: {value: "(room) *"}
+                target: { entity_id: !input line_3_status }
+                data: { value: "(room) *" }
               - service: input_text.set_value
-                target: {entity_id: !input line_4}
+                target: { entity_id: !input line_4 }
                 data:
                   value: >-
-                    {% if list|length >= 5 %}
-                      {{ area_name(list[(idx + 1) % list|length]) or '' }}
+                    {% set arr = list %}
+                    {% if arr | length >= 5 %}
+                      {{ area_name(arr[(idx + 1) % (arr | length)]) or '' }}
                     {% else %}
                       {% set target = idx + 1 %}
-                      {% for item in list %}
+                      {% for item in arr %}
                         {%- if loop.index0 == target -%}
                           {{ area_name(item) or '' }}
                         {%- endif -%}
                       {% endfor %}
                     {% endif %}
               - service: input_text.set_value
-                target: {entity_id: !input line_5}
+                target: { entity_id: !input line_5 }
                 data:
                   value: >-
-                    {% if list|length >= 5 %}
-                      {{ area_name(list[(idx + 2) % list|length]) or '' }}
+                    {% set arr = list %}
+                    {% if arr | length >= 5 %}
+                      {{ area_name(arr[(idx + 2) % (arr | length)]) or '' }}
                     {% else %}
                       {% set target = idx + 2 %}
-                      {% for item in list %}
+                      {% for item in arr %}
                         {%- if loop.index0 == target -%}
                           {{ area_name(item) or '' }}
                         {%- endif -%}
@@ -763,23 +777,23 @@ action:
                     {% endif %}
             else:
                - service: input_text.set_value
-                 target: {entity_id: !input line_1}
-                 data: {value: ""}
+                 target: { entity_id: !input line_1 }
+                 data: { value: "" }
                - service: input_text.set_value
-                 target: {entity_id: !input line_2}
-                 data: {value: ""}
+                 target: { entity_id: !input line_2 }
+                 data: { value: "" }
                - service: input_text.set_value
-                 target: {entity_id: !input line_3}
-                 data: {value: "No Areas Found"}
+                 target: { entity_id: !input line_3 }
+                 data: { value: "No Areas Found" }
                - service: input_text.set_value
-                 target: {entity_id: !input line_3_status}
-                 data: {value: ""}
+                 target: { entity_id: !input line_3_status }
+                 data: { value: "" }
                - service: input_text.set_value
-                 target: {entity_id: !input line_4}
-                 data: {value: ""}
+                 target: { entity_id: !input line_4 }
+                 data: { value: "" }
                - service: input_text.set_value
-                 target: {entity_id: !input line_5}
-                 data: {value: ""}
+                 target: { entity_id: !input line_5 }
+                 data: { value: "" }
 
         else:
           - variables:
@@ -823,16 +837,17 @@ action:
           - if: "{{ list | length > 0 }}"
             then:
               - service: input_text.set_value
-                target: {entity_id: !input line_1}
+                target: { entity_id: !input line_1 }
                 data:
                   value: >-
-                    {% if list|length >= 5 %}
-                      {% set item = list[(idx - 2) % list|length] %}
+                    {% set arr = list %}
+                    {% if arr | length >= 5 %}
+                      {% set item = arr[(idx - 2) % (arr | length)] %}
                       {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
                     {% else %}
                       {% set target = idx - 2 %}
                       {% if target >= 0 %}
-                        {% for item in list %}
+                        {% for item in arr %}
                           {%- if loop.index0 == target -%}
                             {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
                           {%- endif -%}
@@ -840,16 +855,17 @@ action:
                       {% endif %}
                     {% endif %}
               - service: input_text.set_value
-                target: {entity_id: !input line_2}
+                target: { entity_id: !input line_2 }
                 data:
                   value: >-
-                    {% if list|length >= 5 %}
-                      {% set item = list[(idx - 1) % list|length] %}
+                    {% set arr = list %}
+                    {% if arr | length >= 5 %}
+                      {% set item = arr[(idx - 1) % (arr | length)] %}
                       {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
                     {% else %}
                       {% set target = idx - 1 %}
                       {% if target >= 0 %}
-                        {% for item in list %}
+                        {% for item in arr %}
                           {%- if loop.index0 == target -%}
                             {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
                           {%- endif -%}
@@ -857,26 +873,27 @@ action:
                       {% endif %}
                     {% endif %}
               - service: input_text.set_value
-                target: {entity_id: !input line_3}
+                target: { entity_id: !input line_3 }
                 data:
                   value: >-
-                    {% if list|length >= 5 %}
-                      {% set item = list[idx % list|length] %}
+                    {% set arr = list %}
+                    {% if arr | length >= 5 %}
+                      {% set item = arr[idx % (arr | length)] %}
                       {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
                     {% else %}
-                      {% for item in list %}
+                      {% for item in arr %}
                         {%- if loop.index0 == idx -%}
                           {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
                         {%- endif -%}
                       {% endfor %}
                     {% endif %}
               - service: input_text.set_value
-                target: {entity_id: !input line_3_status}
+                target: { entity_id: !input line_3_status }
                 data:
                   value: >
                     {% set entity = list[idx % list|length] %}
                     {% if entity %}
-                      {% set current_status = states(line_3_status_ent) %}
+                      {% set current_status = states(line_3_status_ent) | default('') %}
                       {% if action == 'refresh' and current_status != '' and current_status.startswith('(') and not current_status.startswith('(room)') %}
                         {{ current_status }}
                       {% else %}
@@ -918,30 +935,32 @@ action:
                       {% endif %}
                     {% endif %}
               - service: input_text.set_value
-                target: {entity_id: !input line_4}
+                target: { entity_id: !input line_4 }
                 data:
                   value: >-
-                    {% if list|length >= 5 %}
-                      {% set item = list[(idx + 1) % list|length] %}
+                    {% set arr = list %}
+                    {% if arr | length >= 5 %}
+                      {% set item = arr[(idx + 1) % (arr | length)] %}
                       {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
                     {% else %}
                       {% set target = idx + 1 %}
-                      {% for item in list %}
+                      {% for item in arr %}
                         {%- if loop.index0 == target -%}
                           {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
                         {%- endif -%}
                       {% endfor %}
                     {% endif %}
               - service: input_text.set_value
-                target: {entity_id: !input line_5}
+                target: { entity_id: !input line_5 }
                 data:
                   value: >-
-                    {% if list|length >= 5 %}
-                      {% set item = list[(idx + 2) % list|length] %}
+                    {% set arr = list %}
+                    {% if arr | length >= 5 %}
+                      {% set item = arr[(idx + 2) % (arr | length)] %}
                       {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
                     {% else %}
                       {% set target = idx + 2 %}
-                      {% for item in list %}
+                      {% for item in arr %}
                         {%- if loop.index0 == target -%}
                           {{ state_attr(item, 'friendly_name') or (item.split('.')[1] | replace('_', ' ') | title) }}
                         {%- endif -%}
@@ -949,20 +968,20 @@ action:
                     {% endif %}
             else:
                - service: input_text.set_value
-                 target: {entity_id: !input line_1}
-                 data: {value: ""}
+                 target: { entity_id: !input line_1 }
+                 data: { value: "" }
                - service: input_text.set_value
-                 target: {entity_id: !input line_2}
-                 data: {value: ""}
+                 target: { entity_id: !input line_2 }
+                 data: { value: "" }
                - service: input_text.set_value
-                 target: {entity_id: !input line_3}
-                 data: {value: "Empty Room"}
+                 target: { entity_id: !input line_3 }
+                 data: { value: "Empty Room" }
                - service: input_text.set_value
-                 target: {entity_id: !input line_3_status}
-                 data: {value: ""}
+                 target: { entity_id: !input line_3_status }
+                 data: { value: "" }
                - service: input_text.set_value
-                 target: {entity_id: !input line_4}
-                 data: {value: ""}
+                 target: { entity_id: !input line_4 }
+                 data: { value: "" }
                - service: input_text.set_value
-                 target: {entity_id: !input line_5}
-                 data: {value: ""}
+                 target: { entity_id: !input line_5 }
+                 data: { value: "" }
